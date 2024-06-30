@@ -42,6 +42,6 @@ bool achordion_chord(uint16_t tap_hold_keycode,
                      keyrecord_t* tap_hold_record,
                      uint16_t other_keycode,
                      keyrecord_t* other_record) {
-  return atreus_opposite_hands(tap_hold_record, other_record);
+    return atreus_opposite_hands(tap_hold_record, other_record);
 }
 #endif
