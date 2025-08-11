@@ -8,5 +8,3 @@ MIRYOKU_TAP=QWERTY
 
 SRC += features/achordion.c
 SRC += thirteen37.c
-
-COMBO_ENABLE = yes
