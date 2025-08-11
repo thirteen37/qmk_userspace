@@ -6,18 +6,7 @@
 #include QMK_KEYBOARD_H
 
 #include "manna-harbour_miryoku.h"
-#include "features/achordion.h"
 
-bool process_record_user(uint16_t keycode, keyrecord_t* record) {
-  if (!process_achordion(keycode, record)) { return false; }
-  // Your macros ...
-
-  return true;
-}
-
-void matrix_scan_user(void) {
-  achordion_task();
-}
 
 // Additional Features double tap guard
 
