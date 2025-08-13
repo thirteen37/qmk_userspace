@@ -31,9 +31,6 @@ void suspend_wakeup_init_user(void) {
     adns5050_init();
 }
 
-#define IDLE_TIMEOUT 1000
-#define KEY_CODE KC_F18
-
 static uint16_t idle_timer = 0;
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
