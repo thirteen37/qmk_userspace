@@ -35,15 +35,8 @@ endif
 
 # kludges
 
-COMBO_ENABLE = no
-
 # thumb combos
 ifeq ($(strip $(MIRYOKU_KLUDGE_THUMBCOMBOS)),yes)
   COMBO_ENABLE = yes
   OPT_DEFS += -DMIRYOKU_KLUDGE_THUMBCOMBOS
-endif
-
-# Capslock combo for Cantor keyboards
-ifdef KEYBOARD_cantor
-  COMBO_ENABLE = yes
 endif
