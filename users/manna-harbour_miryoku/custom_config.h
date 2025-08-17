@@ -16,6 +16,8 @@
 
 #define PERMISSIVE_HOLD
 
+#define FLOW_TAP_TERM 150
+
 // Ergodox extended layout
 
 #ifdef KEYBOARD_kinesis
