@@ -1,23 +1,37 @@
-// Copyright 2022 Manna Harbour
-// https://github.com/manna-harbour/miryoku
-
-// This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 2 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <http://www.gnu.org/licenses/>.
-
 #pragma once
 
-// Define LAYOUT_miryoku mapping for CRKBD v4.1 using standard layout
-// Uses LAYOUT_split_3x6_3 for maximum compatibility
+// Define LAYOUT_miryoku mapping for CRKBD v4.1 using extra keys
+// Uses LAYOUT_split_3x6_3_ex2 to utilize the additional keys in v4.1
+//
+// CRKBD v4.1 Layout Options:
+// - LAYOUT_split_3x6_3: Standard 42-key layout (what was used before)
+// - LAYOUT_split_3x6_3_ex2: Extended 44-key layout with 4 extra keys
+// - LAYOUT_split_3x5_3: Minimal 36-key layout
+// - LAYOUT_split_3x5_3_ex2: Minimal + 2 extra keys (38 keys)
+//
+// The extra keys in v4.1 are positioned:
+// - Top right of left half (matrix [0,6])
+// - Top left of right half (matrix [4,6])
+// - Middle right of left half (matrix [1,6])
+// - Middle left of right half (matrix [5,6])
+//
+// Current mapping assigns Caps Lock to all extra keys:
+// - Top extra keys: CAPS (left) and CAPS (right)
+// - Middle extra keys: CAPS (left) and CAPS (right)
+// - Outer columns remain U_NU (unused) for maximum compatibility
+//
+// To customize the extra keys, modify the KC_* assignments below:
 #define LAYOUT_miryoku( \
      K00, K01, K02, K03, K04,      K05, K06, K07, K08, K09, \
      K10, K11, K12, K13, K14,      K15, K16, K17, K18, K19, \
      K20, K21, K22, K23, K24,      K25, K26, K27, K28, K29, \
      N30, N31, K32, K33, K34,      K35, K36, K37, N38, N39 \
 ) \
-LAYOUT_split_3x6_3( \
-     U_NU, K00, K01, K02, K03, K04,      K05, K06, K07, K08, K09, U_NU, \
-     U_NU, K10, K11, K12, K13, K14,      K15, K16, K17, K18, K19, U_NU, \
-     U_NU, K20, K21, K22, K23, K24,      K25, K26, K27, K28, K29, U_NU, \
-                         K32, K33, K34,      K35, K36, K37 \
+LAYOUT_split_3x6_3_ex2( \
+     U_NU, K00, K01, K02, K03, K04, KC_CAPS,     KC_CAPS, K05, K06, K07, K08, K09, U_NU, \
+     U_NU, K10, K11, K12, K13, K14, KC_CAPS,     KC_CAPS, K15, K16, K17, K18, K19, U_NU, \
+     U_NU, K20, K21, K22, K23, K24,                       K25, K26, K27, K28, K29, U_NU, \
+                         K32, K33, K34,                K35, K36, K37 \
 )
 
 // Miryoku configuration
