@@ -36,7 +36,4 @@
   #define EXTRA_SHORT_COMBOS
 #endif
 
-// Enable chordal holds
-#define CHORDAL_HOLD
-
 #include "custom_config.h"
