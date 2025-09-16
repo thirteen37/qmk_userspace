@@ -15,10 +15,15 @@
 // - Middle right of left half (matrix [1,6])
 // - Middle left of right half (matrix [5,6])
 //
-// Current mapping assigns Caps Lock to all extra keys:
-// - Top extra keys: CAPS (left) and CAPS (right)
-// - Middle extra keys: CAPS (left) and CAPS (right)
+// Current mapping for encoder positions:
+// - Top extra keys: KC_CAPS (placeholders for encoders 0 and 1)
+//   * Left encoder (0): Volume control on most layers, context-specific on others
+//   * Right encoder (1): Vertical scroll, undo/redo on nav/button/mouse, volume in media
+// - Middle extra keys: KC_CAPS (placeholders for encoders 2 and 3)
 // - Outer columns remain U_NU (unused) for maximum compatibility
+//
+// Note: The KC_CAPS assignments are placeholders - actual encoder functionality
+// is defined in the encoder_map in keymap.c. Hardware encoders will override these.
 //
 // To customize the extra keys, modify the KC_* assignments below:
 #define LAYOUT_miryoku( \
