@@ -58,32 +58,32 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
         ENCODER_CCW_CW(MS_WHLD, MS_WHLU),    // Vertical scroll
         ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
     },
-    // MEDIA layer - Track and volume controls
+    // MEDIA layer - Volume and track controls (swapped)
     [U_MEDIA] = {
-        ENCODER_CCW_CW(KC_MPRV, KC_MNXT),    // Previous/next track
+        ENCODER_CCW_CW(KC_VOLD, KC_VOLU),    // Left encoder: Volume
         ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(KC_VOLD, KC_VOLU),    // Volume
+        ENCODER_CCW_CW(KC_MPRV, KC_MNXT),    // Right encoder: Previous/next track
         ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
     },
-    // NUM layer - Number increment/decrement and vertical navigation
+    // NUM layer - App switching and vertical navigation
     [U_NUM] = {
-        ENCODER_CCW_CW(KC_MINS, KC_PLUS),    // -/+ for number adjustment
+        ENCODER_CCW_CW(LSFT(LGUI(KC_TAB)), LGUI(KC_TAB)),    // Left encoder: App switching (Cmd+Tab)
         ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(MS_WHLD, MS_WHLU),    // Vertical scroll
+        ENCODER_CCW_CW(MS_WHLD, MS_WHLU),    // Right encoder: Vertical scroll
         ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
     },
-    // SYM layer - Symbol navigation and vertical scroll
+    // SYM layer - Tab switching and vertical scroll
     [U_SYM] = {
-        ENCODER_CCW_CW(KC_LBRC, KC_RBRC),    // Bracket types
+        ENCODER_CCW_CW(LSFT(LCTL(KC_TAB)), LCTL(KC_TAB)),    // Left encoder: Tab switching (Ctrl+Tab)
         ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(MS_WHLD, MS_WHLU),    // Vertical scroll
+        ENCODER_CCW_CW(MS_WHLD, MS_WHLU),    // Right encoder: Vertical scroll
         ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
     },
     // FUN layer - Function keys and system controls
     [U_FUN] = {
-        ENCODER_CCW_CW(KC_BRID, KC_BRIU),    // Screen brightness
+        ENCODER_CCW_CW(RM_PREV, RM_NEXT),    // RGB matrix animation
         ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(MS_WHLD, MS_WHLU),    // Vertical scroll
+        ENCODER_CCW_CW(RM_VALD, RM_VALU),    // RGB matrix brightness
         ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
     }
 };

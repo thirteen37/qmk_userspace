@@ -22,10 +22,6 @@
 // - Middle extra keys: KC_CAPS (placeholders for encoders 2 and 3)
 // - Outer columns remain U_NU (unused) for maximum compatibility
 //
-// Note: The KC_CAPS assignments are placeholders - actual encoder functionality
-// is defined in the encoder_map in keymap.c. Hardware encoders will override these.
-//
-// To customize the extra keys, modify the KC_* assignments below:
 #define LAYOUT_miryoku( \
      K00, K01, K02, K03, K04,      K05, K06, K07, K08, K09, \
      K10, K11, K12, K13, K14,      K15, K16, K17, K18, K19, \
