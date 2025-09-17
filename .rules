@@ -1,0 +1,243 @@
+# QMK Userspace Project Rules for AI Agents
+
+## Project Overview
+This is a QMK userspace directory containing custom keyboard configurations, keymaps, and user-specific code. The userspace pattern allows for personal customizations that can be shared across multiple keyboards while keeping the main QMK firmware repository clean.
+
+## Development Workflow
+
+### Critical Rule: Userspace vs Firmware
+- **ALL configuration changes must be made in `qmk_userspace`, NOT in `qmk_firmware`**
+- The `qmk_firmware` directory is for the core QMK codebase and should remain unmodified
+- User customizations belong in `qmk_userspace` and are linked during the build process
+- **Testing and compilation must be done using the `qmk` command from within the `qmk_firmware` directory**
+
+### Build and Test Process
+1. Make changes in `qmk_userspace`
+2. Navigate to `qmk_firmware` directory for testing
+3. Use `qmk compile` command from `qmk_firmware` for testing
+4. The build system will automatically pull from linked userspace
+
+### Example Workflow
+```bash
+# Edit files in qmk_userspace
+cd qmk_userspace
+# Make changes to keymaps, config files, etc.
+
+# Test and compile from qmk_firmware
+cd ../qmk_firmware
+qmk compile -kb <keyboard> -km <keymap>
+```
+
+## File Organization
+
+### Directory Structure
+```
+qmk_userspace/
+├── .rules                  # This file
+├── qmk.json               # Userspace configuration
+├── users/                 # Shared user code
+│   └── <username>/        # Personal user directory
+├── keyboards/             # Keyboard-specific overrides
+│   └── <keyboard_name>/
+├── keymaps/              # Custom keymaps
+│   └── <keyboard_name>/
+└── layouts/              # Layout-specific code
+```
+
+### Configuration Files
+- `qmk.json`: Main userspace configuration (userspace_id, build_targets, etc.)
+- `rules.mk`: Build rules and feature flags
+- `config.h`: C preprocessor definitions and configurations
+- `<username>.h`: Personal header file with shared definitions
+- `<username>.c`: Personal source file with shared functions
+
+## Code Style and Standards
+
+### C Code Conventions
+- Use 4-space indentation (no tabs)
+- Follow QMK naming conventions: `SNAKE_CASE` for constants, `snake_case` for functions
+- Prefix personal functions with username: `<username>_function_name()`
+- Use descriptive variable names
+- Comment complex logic and custom key behaviors
+
+### Keymap Conventions
+- **Preferred Layout**: Miryoku (unless otherwise specified)
+- Use semantic layer names: `_BASE`, `_LOWER`, `_RAISE`, `_ADJUST`
+- Define custom keycodes with descriptive names
+- Group related functionality in layers
+- Document layer purposes in comments
+
+### Configuration Management
+- Use `config.h` for compile-time settings
+- Use `rules.mk` for build flags and features
+- Keep keyboard-specific settings in keyboard directories
+- Use userspace for cross-keyboard shared settings
+
+## QMK Features and APIs
+
+### Common Features to Configure
+- **Tap Dance**: Custom tap/hold behaviors
+- **Combo Keys**: Multiple key press combinations
+- **Leader Key**: Sequence-based shortcuts
+- **RGB/LED Control**: Lighting customization
+- **Rotary Encoders**: Knob functionality
+- **OLED Displays**: Custom screen content
+
+### Preferred QMK APIs
+- `process_record_user()`: Custom keycode handling
+- `matrix_init_user()`: Initialization code
+- `layer_state_set_user()`: Layer change handling
+- `led_set_user()`: LED state management
+- Use QMK's built-in functions over custom implementations
+
+## Hardware Considerations
+
+### Keyboard Types
+- Support various layouts: ortholinear, staggered, split, etc.
+- Account for different switch types and actuation
+- Consider physical constraints when designing keymaps
+- Test on actual hardware, not just simulation
+
+### MCU and Memory
+- Be mindful of flash and RAM limitations
+- Use `#ifdef` guards for optional features
+- Profile memory usage for complex configurations
+- Optimize for the target microcontroller
+
+## Testing and Debugging
+
+### Build Testing
+- Always compile before committing changes
+- Test on multiple keyboards if shared code is modified
+- Verify feature flags work correctly
+- Check for compilation warnings and errors
+
+### Runtime Testing
+- Test all custom keycodes and behaviors
+- Verify layer switching works as expected
+- Test edge cases and key combinations
+- Validate timing-sensitive features (tap dance, etc.)
+
+### Debugging Tools
+- Use `print()` statements for debugging (requires console)
+- LED indicators for state visualization
+- OLED display for runtime information
+- QMK's built-in debugging features
+
+## Version Control and Maintenance
+
+### Git Practices
+- Commit logical changes separately
+- Use descriptive commit messages
+- Tag stable configurations
+- Keep personal sensitive data out of commits
+
+### Documentation
+- Document keymap layouts and purposes
+- Explain complex custom behaviors
+- Include build instructions
+- Maintain changelog for significant updates
+
+## Security and Privacy
+
+### Sensitive Information
+- Never commit passwords or API keys
+- Use environment variables or local config files
+- Be careful with macro content that might contain sensitive data
+- Consider privacy implications of logged keystrokes
+
+## Integration with QMK Ecosystem
+
+### QMK CLI Integration
+- Use `qmk config user.qmk_home` to set userspace location
+- Leverage `qmk doctor` for environment verification
+- Use `qmk compile` with `-e` for environment variables
+- Use `qmk compile` for testing (avoid `qmk flash` during development)
+
+### Community Integration
+- Follow QMK community standards for sharing
+- Use standard configuration patterns when possible
+- Contribute improvements back to main QMK if applicable
+- Reference official QMK documentation for best practices
+
+## Troubleshooting Common Issues
+
+### Build Problems
+- Ensure `qmk_firmware` is up to date
+- Check that userspace is properly linked
+- Verify all required dependencies are installed
+- Clear build cache if experiencing odd errors
+
+### Runtime Issues
+- Check MCU memory usage if experiencing crashes
+- Verify pin assignments for custom hardware
+- Test with minimal configuration to isolate problems
+- Use QMK's debugging output for investigation
+
+## Performance Guidelines
+
+### Code Efficiency
+- Minimize processing in interrupt handlers
+- Use appropriate data types for memory efficiency
+- Cache frequently used calculations
+- Profile timing-critical code paths
+
+### Feature Selection
+- Enable only needed features to save memory
+- Use conditional compilation for optional features
+- Balance functionality with resource constraints
+- Consider battery life for wireless keyboards
+
+## Change Management
+
+### Before Making Changes
+1. Document current working configuration
+2. Test existing functionality
+3. Plan changes in logical increments
+4. Consider impact on other keyboards/keymaps
+
+### After Making Changes
+1. Compile and test thoroughly
+2. Update documentation as needed
+3. Commit changes with clear messages
+4. Verify no regression in existing functionality
+
+## Development Environment
+
+### Required Tools
+- QMK CLI properly configured
+- C compiler toolchain (avr-gcc, arm-gcc as needed)
+- Git for version control
+- Text editor with C syntax support
+
+### Recommended Setup
+- QMK development environment properly configured
+- Hardware for testing (actual keyboards)
+- Serial console for debugging output
+- Backup of working configurations
+
+## File Naming Conventions
+
+### Source Files
+- User files: `<username>.c`, `<username>.h`
+- Keymap files: `keymap.c`, `config.h`, `rules.mk`
+- Keyboard-specific: `<keyboard>_<username>.c`
+
+### Directory Naming
+- Use QMK standard directory names
+- Follow keyboard manufacturer naming
+- Use lowercase with underscores for custom directories
+- Keep names descriptive but concise
+
+## Best Practices Summary
+
+1. **Always work in userspace, test from firmware directory**
+2. Start with simple configurations and build complexity gradually
+3. Test thoroughly on actual hardware
+4. Document configurations and custom behaviors
+5. Follow QMK community standards and conventions
+6. Keep sensitive information out of version control
+7. Use QMK's built-in features before writing custom code
+8. Consider memory and performance constraints
+9. Maintain clean, readable, and well-commented code
+10. Stay updated with QMK releases and best practices
