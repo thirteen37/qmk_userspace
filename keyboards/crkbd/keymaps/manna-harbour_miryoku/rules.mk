@@ -4,6 +4,3 @@ WS2812_DRIVER = vendor
 
 # Split keyboard features for v4.1
 SPLIT_KEYBOARD = yes
-
-# Enable encoder mapping for rotary encoders
-ENCODER_MAP_ENABLE = yes

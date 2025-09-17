@@ -1,6 +1,6 @@
 # CRKBD v4.1 Miryoku Encoder Configuration
 
-This keymap adds encoder support to the Miryoku layout for the CRKBD v4.1 keyboard with contextual functionality across all layers. Note this only works with the `rev4_1` versions, in either the mini or standard variants.
+This keymap adds comprehensive encoder support to the Miryoku layout for the CRKBD v4.1 keyboard with contextual functionality across all layers. All encoder behavior is handled through a single callback function for precise control and enhanced app/tab switching with modifier hold logic. Note this only works with the `rev4_1` versions, in either the mini or standard variants.
 
 ## Hardware Requirements
 
@@ -10,47 +10,27 @@ This keymap adds encoder support to the Miryoku layout for the CRKBD v4.1 keyboa
   - Left encoder: matrix position [0,0] (first encoder)
   - Right encoder: matrix position [2,0] (third encoder)
 
-## Encoder Functionality by Layer
+## Comprehensive Encoder Implementation
 
-### Base Layer (U_BASE)
-- **Left Encoder**: Volume down/up (`KC_VOLD`/`KC_VOLU`)
-- **Right Encoder**: Vertical scroll down/up (`MS_WHLD`/`MS_WHLU`)
+All encoder behavior is handled through a single `encoder_update_user()` callback function, eliminating the complexity of encoder maps and providing complete control over functionality. The NUM and SYM layers feature enhanced app and tab switching with modifier hold logic:
 
-### Extra Layer (U_EXTRA)  
-- **Left Encoder**: Volume down/up (`KC_VOLD`/`KC_VOLU`)
-- **Right Encoder**: Vertical scroll down/up (`MS_WHLD`/`MS_WHLU`)
+### How It Works
+1. **Single Callback**: All encoders handled by `encoder_update_user()` function - no encoder maps used
+2. **Layer Detection**: Function detects current layer and executes appropriate encoder behavior
+3. **Modifier Hold**: For NUM/SYM layers, modifiers are held only when encoder is rotated
+4. **Layer Exit**: When you exit the layer, any held modifiers are automatically released
 
-### Tap Layer (U_TAP)
-- **Left Encoder**: Volume down/up (`KC_VOLD`/`KC_VOLU`)
-- **Right Encoder**: Vertical scroll down/up (`MS_WHLD`/`MS_WHLU`)
+### Benefits
+- **Simplified Architecture**: Single callback function handles all encoder behavior
+- **Smooth Navigation**: Rotate through multiple apps/tabs in one gesture
+- **No Interference**: Other keys in layers work normally (no unwanted modifiers)
+- **Precise Control**: Each layer has exactly defined encoder behavior
+- **Clean Implementation**: No encoder map complexity or conflicts
+- **Cross-Platform**: Uses standard shortcuts (CMD+Tab on macOS, CTRL+Tab for browsers)
 
-### Button Layer (U_BUTTON)
-- **Left Encoder**: Mouse acceleration slow/fast (`KC_ACL0`/`KC_ACL2`)
-- **Right Encoder**: Undo/redo (`U_UND`/`U_RDO`)
-
-### Navigation Layer (U_NAV)
-- **Left Encoder**: Page down/up (`KC_PGDN`/`KC_PGUP`)
-- **Right Encoder**: Undo/redo (`U_UND`/`U_RDO`)
-
-### Mouse Layer (U_MOUSE)
-- **Left Encoder**: Horizontal scroll left/right (`MS_WHLL`/`MS_WHLR`)
-- **Right Encoder**: Vertical scroll down/up (`MS_WHLD`/`MS_WHLU`)
-
-### Media Layer (U_MEDIA)
-- **Left Encoder**: Volume down/up (`KC_VOLD`/`KC_VOLU`)
-- **Right Encoder**: Previous/next track (`KC_MPRV`/`KC_MNXT`)
-
-### Number Layer (U_NUM)
-- **Left Encoder**: App switching backward/forward (`Shift+Cmd+Tab`/`Cmd+Tab`)
-- **Right Encoder**: Vertical scroll down/up (`MS_WHLD`/`MS_WHLU`)
-
-### Symbol Layer (U_SYM)
-- **Left Encoder**: Tab switching backward/forward (`Shift+Ctrl+Tab`/`Ctrl+Tab`)
-- **Right Encoder**: Vertical scroll down/up (`MS_WHLD`/`MS_WHLU`)
-
-### Function Layer (U_FUN)
-- **Left Encoder**: RGB animation previous/next (`RM_PREV`/`RM_NEXT`)
-- **Right Encoder**: RGB brightness down/up (`RM_VALD`/`RM_VALU`)
+### Usage Examples
+- **App Switching**: Hold NUM layer → rotate left encoder (CMD auto-held) → continue rotating → release layer
+- **Tab Switching**: Hold SYM layer → rotate left encoder (CTRL auto-held) → continue rotating → release layer
 
 ## Undo/Redo Functionality
 
@@ -71,20 +51,23 @@ The clipboard system is configured in the Miryoku userspace configuration.
 | Nav | Page Up/Down | Undo/Redo |
 | Mouse | Horizontal Scroll | Vertical Scroll |
 | Media | Volume | Track Prev/Next |
-| Num | App Switching | Vertical Scroll |
-| Sym | Tab Switching | Vertical Scroll |
-| Fun | RGB Animation | RGB Brightness |
+| Num | App Switching (Enhanced) | Vertical Scroll |
+| Sym | Tab Switching (Enhanced) | Vertical Scroll |
+| Fun | RGB Animation (Direct) | RGB Brightness (Direct) |
 
 ## Configuration Files
 
 ### keymap.c
-Contains the encoder mapping definitions using the `encoder_map` array. Each layer specifies the behavior for all 4 potential encoder positions, with only the first (left) and third (right) encoders actually used.
+Contains comprehensive encoder behavior implementation through callback functions:
 
-The encoder mapping uses a 4-encoder array format:
-- Position 0: Left encoder (active)
-- Position 1: Unused encoder (set to `KC_TRNS`)
-- Position 2: Right encoder (active)  
-- Position 3: Unused encoder (set to `KC_TRNS`)
+**Comprehensive Encoder Logic**: 
+- `encoder_update_user()` function handles ALL encoder behavior for every layer
+- Each layer has specific encoder behaviors implemented in a switch statement
+- App/tab switching uses modifier hold logic for smooth multi-step navigation
+- RGB matrix controls use direct function calls (`rgb_matrix_step()`, `rgb_matrix_increase_val()`, etc.)
+- `layer_state_set_user()` function cleans up held modifiers when layers are exited
+- Uses `register_mods()`, `unregister_mods()`, and `tap_code()` for precise control
+- Single source of truth for all encoder functionality
 
 ### config.h
 - Maps the Miryoku layout to `LAYOUT_split_3x6_3_ex2` to utilize extra key positions
@@ -92,7 +75,6 @@ The encoder mapping uses a 4-encoder array format:
 - Extra key positions have `KC_CAPS` placeholders (overridden by hardware encoders)
 
 ### rules.mk
-- Enables `ENCODER_MAP_ENABLE = yes` to use the encoder mapping feature
 - Enables RGB matrix support for the 46 LEDs on CRKBD v4.1
 - Configures split keyboard features
 
@@ -104,15 +86,6 @@ The encoder mapping uses a 4-encoder array format:
    qmk compile -kb crkbd/rev4_1/standard -km manna-harbour_miryoku
    ```
 3. Flash the resulting `crkbd_rev4_1_standard_manna-harbour_miryoku.uf2` file to both halves
-
-## Customization
-
-To modify encoder behavior:
-
-1. Edit the `encoder_map` array in `keymap.c`
-2. Use `ENCODER_CCW_CW(counter_clockwise_keycode, clockwise_keycode)` format
-3. Each layer array has 4 positions: `[left_encoder, unused_encoder1, right_encoder, unused_encoder3]`
-4. Set unused positions to `ENCODER_CCW_CW(KC_TRNS, KC_TRNS)` for transparency
 
 ## Hardware Notes
 
@@ -127,14 +100,24 @@ To modify encoder behavior:
 
 ### Encoders not responding
 - Check encoder wiring and solder connections
-- Verify `ENCODER_MAP_ENABLE = yes` in rules.mk
+- Verify that `ENCODER_MAP_ENABLE` is NOT set in rules.mk (we use callback instead)
 - Ensure correct keyboard variant: `crkbd/rev4_1/standard`
+- Check that `encoder_update_user()` function is present and returning `false`
 
 ### Wrong encoder behavior
 - Verify layer is correctly activated
-- Check encoder mapping in `keymap.c` for the specific layer
-- Encoder direction can be swapped by reversing the CCW/CW keycodes
+- Check encoder logic in `encoder_update_user()` function for the specific layer
+- Encoder direction can be swapped by changing clockwise/counter-clockwise logic
+- No encoder maps are used - all behavior is handled in callback function
 - Uses modern mouse wheel codes (`MS_WHLU`, `MS_WHLD`, `MS_WHLL`, `MS_WHLR`)
+
+### App/Tab switching issues
+- **Modifiers not held**: Check `encoder_update_user()` and `layer_state_set_user()` functions are present
+- **Switching too fast**: Encoder sends discrete Tab presses, speed depends on rotation rate
+- **Wrong direction**: Check clockwise/counter-clockwise logic in `encoder_update_user()` switch statement
+- **Stuck modifiers**: Exit and re-enter layer to reset; modifiers auto-release on layer exit
+- **Other keys affected**: Modifiers are only registered when encoder is rotated, not on layer entry
+- **Fallback to base behavior**: No encoder maps used; all behavior defined in callback function
 
 ### Compilation errors
 - Ensure using CRKBD v4.1 variant (not rev1)

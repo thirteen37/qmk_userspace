@@ -6,6 +6,35 @@
 #include QMK_KEYBOARD_H
 #include "manna-harbour_miryoku.h"
 
+// Comprehensive Encoder Behavior Implementation
+//
+// This implementation handles ALL encoder behavior through the encoder_update_user()
+// callback function, providing complete control over encoder functionality per layer.
+// No encoder maps are used - everything is handled in the callback.
+//
+// Enhanced App/Tab Switching:
+// NUM Layer: App switching with CMD+Tab
+// - CMD key is held only when left encoder is rotated
+// - Each rotation sends Tab (forward) or Shift+Tab (backward)
+// - CMD remains held until NUM layer is exited
+//
+// SYM Layer: Tab switching with CTRL+Tab
+// - CTRL key is held only when left encoder is rotated
+// - Each rotation sends Tab (forward) or Shift+Tab (backward)
+// - CTRL remains held until SYM layer is exited
+//
+// All Other Layers:
+// Handled through encoder_update_user() with appropriate layer-specific behavior
+// including volume, scrolling, undo/redo, mouse acceleration, RGB controls, etc.
+
+// State tracking for modifier hold behavior
+typedef struct {
+    bool app_switching_active;    // CMD held for app switching on NUM layer
+    bool tab_switching_active;    // CTRL held for tab switching on SYM layer
+} modifier_state_t;
+
+static modifier_state_t mod_state = {false, false};
+
 const char chordal_hold_layout[MATRIX_ROWS][MATRIX_COLS] PROGMEM =
     LAYOUT_split_3x6_3_ex2(
         'L', 'L', 'L', 'L', 'L', 'L', 'L',  'R', 'R', 'R', 'R', 'R', 'R', 'R',
@@ -14,77 +43,123 @@ const char chordal_hold_layout[MATRIX_ROWS][MATRIX_COLS] PROGMEM =
                             'X', 'X', 'X',  'X', 'X', 'X'
     );
 
-#ifdef ENCODER_MAP_ENABLE
-const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
-    // BASE layer - Volume and vertical scroll
-    [U_BASE] = {
-        ENCODER_CCW_CW(KC_VOLD, KC_VOLU),    // Left encoder: Volume
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS),    // Encoder 1 (if present)
-        ENCODER_CCW_CW(MS_WHLD, MS_WHLU),    // Right encoder: Vertical scroll
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS)     // Encoder 3 (if present)
-    },
-    // EXTRA layer - Same as base
-    [U_EXTRA] = {
-        ENCODER_CCW_CW(KC_VOLD, KC_VOLU),
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(MS_WHLD, MS_WHLU),
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
-    },
-    // TAP layer - Same as base
-    [U_TAP] = {
-        ENCODER_CCW_CW(KC_VOLD, KC_VOLU),
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(MS_WHLD, MS_WHLU),
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
-    },
-    // BUTTON layer - Click precision and undo/redo
-    [U_BUTTON] = { 
-        ENCODER_CCW_CW(KC_ACL0, KC_ACL2),    // Mouse acceleration
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(U_UND, U_RDO),        // Undo/redo
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
-    },
-    // NAV layer - Page navigation and undo/redo
-    [U_NAV] = { 
-        ENCODER_CCW_CW(KC_PGDN, KC_PGUP),    // Page up/down
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(U_UND, U_RDO),        // Undo/redo
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
-    },
-    // MOUSE layer - Scroll wheel controls
-    [U_MOUSE] = { 
-        ENCODER_CCW_CW(MS_WHLL, MS_WHLR),    // Horizontal scroll
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(MS_WHLD, MS_WHLU),    // Vertical scroll
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
-    },
-    // MEDIA layer - Volume and track controls (swapped)
-    [U_MEDIA] = {
-        ENCODER_CCW_CW(KC_VOLD, KC_VOLU),    // Left encoder: Volume
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(KC_MPRV, KC_MNXT),    // Right encoder: Previous/next track
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
-    },
-    // NUM layer - App switching and vertical navigation
-    [U_NUM] = {
-        ENCODER_CCW_CW(LSFT(LGUI(KC_TAB)), LGUI(KC_TAB)),    // Left encoder: App switching (Cmd+Tab)
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(MS_WHLD, MS_WHLU),    // Right encoder: Vertical scroll
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
-    },
-    // SYM layer - Tab switching and vertical scroll
-    [U_SYM] = {
-        ENCODER_CCW_CW(LSFT(LCTL(KC_TAB)), LCTL(KC_TAB)),    // Left encoder: Tab switching (Ctrl+Tab)
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(MS_WHLD, MS_WHLU),    // Right encoder: Vertical scroll
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
-    },
-    // FUN layer - Function keys and system controls
-    [U_FUN] = {
-        ENCODER_CCW_CW(RM_PREV, RM_NEXT),    // RGB matrix animation
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS),
-        ENCODER_CCW_CW(RM_VALD, RM_VALU),    // RGB matrix brightness
-        ENCODER_CCW_CW(KC_TRNS, KC_TRNS)
+
+// All encoder behavior handled by encoder_update_user() callback function below
+
+bool encoder_update_user(uint8_t index, bool clockwise) {
+    // Get current layer
+    uint8_t current_layer = get_highest_layer(layer_state);
+
+    // Handle all encoder behavior based on current layer and encoder index
+    switch (current_layer) {
+        case U_BASE:
+        case U_EXTRA:
+        case U_TAP:
+            if (index == 0) { // Left encoder: Volume
+                tap_code(clockwise ? KC_VOLU : KC_VOLD);
+            } else if (index == 2) { // Right encoder: Vertical scroll
+                tap_code(clockwise ? MS_WHLU : MS_WHLD);
+            }
+            break;
+
+        case U_BUTTON:
+            if (index == 0) { // Left encoder: Mouse acceleration
+                tap_code(clockwise ? KC_ACL2 : KC_ACL0);
+            } else if (index == 2) { // Right encoder: Undo/redo
+                tap_code(clockwise ? U_RDO : U_UND);
+            }
+            break;
+
+        case U_NAV:
+            if (index == 0) { // Left encoder: Page up/down
+                tap_code(clockwise ? KC_PGUP : KC_PGDN);
+            } else if (index == 2) { // Right encoder: Undo/redo
+                tap_code(clockwise ? U_RDO : U_UND);
+            }
+            break;
+
+        case U_MOUSE:
+            if (index == 0) { // Left encoder: Horizontal scroll
+                tap_code(clockwise ? MS_WHLR : MS_WHLL);
+            } else if (index == 2) { // Right encoder: Vertical scroll
+                tap_code(clockwise ? MS_WHLU : MS_WHLD);
+            }
+            break;
+
+        case U_MEDIA:
+            if (index == 0) { // Left encoder: Volume
+                tap_code(clockwise ? KC_VOLU : KC_VOLD);
+            } else if (index == 2) { // Right encoder: Track prev/next
+                tap_code(clockwise ? KC_MNXT : KC_MPRV);
+            }
+            break;
+
+        case U_NUM:
+            if (index == 0) { // Left encoder: App switching with CMD held
+                if (!mod_state.app_switching_active) {
+                    register_mods(MOD_BIT(KC_LGUI));
+                    mod_state.app_switching_active = true;
+                }
+                if (clockwise) {
+                    tap_code(KC_TAB);
+                } else {
+                    tap_code16(LSFT(KC_TAB));
+                }
+            } else if (index == 2) { // Right encoder: Vertical scroll
+                tap_code(clockwise ? MS_WHLU : MS_WHLD);
+            }
+            break;
+
+        case U_SYM:
+            if (index == 0) { // Left encoder: Tab switching with CTRL held
+                if (!mod_state.tab_switching_active) {
+                    register_mods(MOD_BIT(KC_LCTL));
+                    mod_state.tab_switching_active = true;
+                }
+                if (clockwise) {
+                    tap_code(KC_TAB);
+                } else {
+                    tap_code16(LSFT(KC_TAB));
+                }
+            } else if (index == 2) { // Right encoder: Vertical scroll
+                tap_code(clockwise ? MS_WHLU : MS_WHLD);
+            }
+            break;
+
+        case U_FUN:
+            if (index == 0) { // Left encoder: RGB animation
+                // Use direct RGB matrix functions instead of keycodes with tap_code()
+                if (clockwise) {
+                    rgb_matrix_step();
+                } else {
+                    rgb_matrix_step_reverse();
+                }
+            } else if (index == 2) { // Right encoder: RGB brightness
+                // Use direct RGB matrix functions for immediate effect
+                if (clockwise) {
+                    rgb_matrix_increase_val();
+                } else {
+                    rgb_matrix_decrease_val();
+                }
+            }
+            break;
     }
-};
-#endif
+
+    return false; // Skip default encoder handling since we handle everything here
+}
+
+layer_state_t layer_state_set_user(layer_state_t state) {
+    // Release CMD if NUM layer is no longer active and we were app switching
+    if (!layer_state_cmp(state, U_NUM) && mod_state.app_switching_active) {
+        unregister_mods(MOD_BIT(KC_LGUI));
+        mod_state.app_switching_active = false;
+    }
+
+    // Release CTRL if SYM layer is no longer active and we were tab switching
+    if (!layer_state_cmp(state, U_SYM) && mod_state.tab_switching_active) {
+        unregister_mods(MOD_BIT(KC_LCTL));
+        mod_state.tab_switching_active = false;
+    }
+
+    return state;
+}
