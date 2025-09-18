@@ -68,16 +68,16 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
             break;
 
         case U_BUTTON:
-            if (index == 0) { // Left encoder: Mouse acceleration
-                tap_code(clockwise ? KC_ACL2 : KC_ACL0);
+            if (index == 0) { // Left encoder: Browser forward/backward
+                tap_code16(clockwise ? LGUI(KC_RBRC) : LGUI(KC_LBRC));
             } else if (index == 2) { // Right encoder: Undo/redo
                 tap_code16(clockwise ? U_RDO : U_UND); // Use tap_code16 for modifier combinations
             }
             break;
 
         case U_NAV:
-            if (index == 0) { // Left encoder: Page up/down
-                tap_code(clockwise ? KC_PGUP : KC_PGDN);
+            if (index == 0) { // Left encoder: Left/right cursor
+                tap_code(clockwise ? KC_RGHT : KC_LEFT);
             } else if (index == 2) { // Right encoder: Undo/redo
                 tap_code16(clockwise ? U_RDO : U_UND); // Use tap_code16 for modifier combinations
             }

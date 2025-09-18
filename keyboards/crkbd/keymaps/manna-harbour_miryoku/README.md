@@ -47,8 +47,8 @@ The clipboard system is configured in the Miryoku userspace configuration.
 | Layer | Left Encoder | Right Encoder |
 |-------|-------------|---------------|
 | Base/Extra/Tap | Volume | Vertical Scroll |
-| Button | Mouse Accel | Undo/Redo |
-| Nav | Page Up/Down | Undo/Redo |
+| Button | Browser Forward/Back (CMD+]/[) | Undo/Redo |
+| Nav | Left/Right Cursor | Undo/Redo |
 | Mouse | Horizontal Scroll | Vertical Scroll |
 | Media | Volume | Track Prev/Next |
 | Num | App Switching (Enhanced) | Vertical Scroll |
