@@ -6,6 +6,33 @@
 #include QMK_KEYBOARD_H
 #include "manna-harbour_miryoku.h"
 
+// CRKBD-specific platform-agnostic user codes for encoder behavior
+// Browser navigation and app/tab switching that adapts to the current platform:
+// - Mac: CMD+[ / CMD+] for browser, CMD for app switching, CTRL for tab switching
+// - Windows/Linux: Browser media keys (KC_WFWD/KC_WBAK) for navigation, ALT for app switching, CTRL for tab switching
+// - FUN mode: Not available (set to KC_NO)
+#if defined (MIRYOKU_CLIPBOARD_FUN)
+  #define U_FWD KC_NO // Browser forward - not available in FUN mode
+  #define U_BCK KC_NO // Browser backward - not available in FUN mode
+  #define U_APP_MOD MOD_BIT(KC_NO) // App switch modifier - not available in FUN mode
+  #define U_TAB_MOD MOD_BIT(KC_NO) // Tab switch modifier - not available in FUN mode
+#elif defined (MIRYOKU_CLIPBOARD_MAC)
+  #define U_FWD LGUI(KC_RBRC) // Browser forward
+  #define U_BCK LGUI(KC_LBRC) // Browser backward
+  #define U_APP_MOD MOD_BIT(KC_LGUI) // App switch modifier (CMD)
+  #define U_TAB_MOD MOD_BIT(KC_LCTL) // Tab switch modifier (CTRL)
+#elif defined (MIRYOKU_CLIPBOARD_WIN)
+  #define U_FWD KC_WFWD // Browser forward (media key)
+  #define U_BCK KC_WBAK // Browser backward (media key)
+  #define U_APP_MOD MOD_BIT(KC_LALT) // App switch modifier (ALT)
+  #define U_TAB_MOD MOD_BIT(KC_LCTL) // Tab switch modifier (CTRL)
+#else
+  #define U_FWD KC_WFWD // Browser forward (media key, default)
+  #define U_BCK KC_WBAK // Browser backward (media key, default)
+  #define U_APP_MOD MOD_BIT(KC_LALT) // App switch modifier (ALT, default)
+  #define U_TAB_MOD MOD_BIT(KC_LCTL) // Tab switch modifier (CTRL, default)
+#endif
+
 // Comprehensive Encoder Behavior Implementation
 //
 // This implementation handles ALL encoder behavior through the encoder_update_user()
@@ -13,10 +40,10 @@
 // No encoder maps are used - everything is handled in the callback.
 //
 // Enhanced App/Tab Switching:
-// NUM Layer: App switching with CMD+Tab
-// - CMD key is held only when left encoder is rotated
+// NUM Layer: App switching with platform modifier+Tab
+// - Platform modifier (CMD on Mac, ALT on Windows/Linux) is held only when left encoder is rotated
 // - Each rotation sends Tab (forward) or Shift+Tab (backward)
-// - CMD remains held until NUM layer is exited
+// - Platform modifier remains held until NUM layer is exited
 //
 // SYM Layer: Tab switching with CTRL+Tab
 // - CTRL key is held only when left encoder is rotated
@@ -34,7 +61,7 @@
 
 // State tracking for modifier hold behavior
 typedef struct {
-    bool app_switching_active;    // CMD held for app switching on NUM layer
+    bool app_switching_active;    // Platform modifier held for app switching on NUM layer
     bool tab_switching_active;    // CTRL held for tab switching on SYM layer
 } modifier_state_t;
 
@@ -68,8 +95,8 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
             break;
 
         case U_BUTTON:
-            if (index == 0) { // Left encoder: Browser forward/backward
-                tap_code16(clockwise ? LGUI(KC_RBRC) : LGUI(KC_LBRC));
+            if (index == 0) { // Left encoder: Browser forward/backward (media keys on Windows/Linux, CMD+[/] on Mac)
+                tap_code16(clockwise ? U_FWD : U_BCK);
             } else if (index == 2) { // Right encoder: Undo/redo
                 tap_code16(clockwise ? U_RDO : U_UND); // Use tap_code16 for modifier combinations
             }
@@ -100,9 +127,9 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
             break;
 
         case U_NUM:
-            if (index == 0) { // Left encoder: App switching with CMD held
+            if (index == 0) { // Left encoder: App switching with platform modifier held
                 if (!mod_state.app_switching_active) {
-                    register_mods(MOD_BIT(KC_LGUI));
+                    register_mods(U_APP_MOD);
                     mod_state.app_switching_active = true;
                 }
                 if (clockwise) {
@@ -116,9 +143,9 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
             break;
 
         case U_SYM:
-            if (index == 0) { // Left encoder: Tab switching with CTRL held
+            if (index == 0) { // Left encoder: Tab switching with platform modifier held
                 if (!mod_state.tab_switching_active) {
-                    register_mods(MOD_BIT(KC_LCTL));
+                    register_mods(U_TAB_MOD);
                     mod_state.tab_switching_active = true;
                 }
                 if (clockwise) {
@@ -154,15 +181,15 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
 }
 
 layer_state_t layer_state_set_user(layer_state_t state) {
-    // Release CMD if NUM layer is no longer active and we were app switching
+    // Release app switch modifier if NUM layer is no longer active and we were app switching
     if (!layer_state_cmp(state, U_NUM) && mod_state.app_switching_active) {
-        unregister_mods(MOD_BIT(KC_LGUI));
+        unregister_mods(U_APP_MOD);
         mod_state.app_switching_active = false;
     }
 
-    // Release CTRL if SYM layer is no longer active and we were tab switching
+    // Release tab switch modifier if SYM layer is no longer active and we were tab switching
     if (!layer_state_cmp(state, U_SYM) && mod_state.tab_switching_active) {
-        unregister_mods(MOD_BIT(KC_LCTL));
+        unregister_mods(U_TAB_MOD);
         mod_state.tab_switching_active = false;
     }
 
