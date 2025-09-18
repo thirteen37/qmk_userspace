@@ -26,6 +26,11 @@
 // All Other Layers:
 // Handled through encoder_update_user() with appropriate layer-specific behavior
 // including volume, scrolling, undo/redo, mouse acceleration, RGB controls, etc.
+//
+// Function Usage Notes:
+// - tap_code(): For basic keycodes (volume, media, page up/down, mouse wheel)
+// - tap_code16(): For keycodes with modifiers (undo/redo, app/tab switching)
+// - Direct functions: For RGB matrix controls (immediate effect)
 
 // State tracking for modifier hold behavior
 typedef struct {
@@ -66,7 +71,7 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
             if (index == 0) { // Left encoder: Mouse acceleration
                 tap_code(clockwise ? KC_ACL2 : KC_ACL0);
             } else if (index == 2) { // Right encoder: Undo/redo
-                tap_code(clockwise ? U_RDO : U_UND);
+                tap_code16(clockwise ? U_RDO : U_UND); // Use tap_code16 for modifier combinations
             }
             break;
 
@@ -74,7 +79,7 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
             if (index == 0) { // Left encoder: Page up/down
                 tap_code(clockwise ? KC_PGUP : KC_PGDN);
             } else if (index == 2) { // Right encoder: Undo/redo
-                tap_code(clockwise ? U_RDO : U_UND);
+                tap_code16(clockwise ? U_RDO : U_UND); // Use tap_code16 for modifier combinations
             }
             break;
 
@@ -103,7 +108,7 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
                 if (clockwise) {
                     tap_code(KC_TAB);
                 } else {
-                    tap_code16(LSFT(KC_TAB));
+                    tap_code16(LSFT(KC_TAB)); // Use tap_code16 for modifier combinations
                 }
             } else if (index == 2) { // Right encoder: Vertical scroll
                 tap_code(clockwise ? MS_WHLU : MS_WHLD);
@@ -119,7 +124,7 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
                 if (clockwise) {
                     tap_code(KC_TAB);
                 } else {
-                    tap_code16(LSFT(KC_TAB));
+                    tap_code16(LSFT(KC_TAB)); // Use tap_code16 for modifier combinations
                 }
             } else if (index == 2) { // Right encoder: Vertical scroll
                 tap_code(clockwise ? MS_WHLU : MS_WHLD);

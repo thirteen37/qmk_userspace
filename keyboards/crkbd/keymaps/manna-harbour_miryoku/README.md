@@ -66,7 +66,10 @@ Contains comprehensive encoder behavior implementation through callback function
 - App/tab switching uses modifier hold logic for smooth multi-step navigation
 - RGB matrix controls use direct function calls (`rgb_matrix_step()`, `rgb_matrix_increase_val()`, etc.)
 - `layer_state_set_user()` function cleans up held modifiers when layers are exited
-- Uses `register_mods()`, `unregister_mods()`, and `tap_code()` for precise control
+- Uses different function types for different keycodes:
+  - `tap_code()`: Basic keycodes (volume, media, scrolling, page navigation)
+  - `tap_code16()`: Keycodes with modifiers (undo/redo, app/tab switching)
+  - Direct functions: RGB matrix controls for immediate effect
 - Single source of truth for all encoder functionality
 
 ### config.h
@@ -118,6 +121,11 @@ Contains comprehensive encoder behavior implementation through callback function
 - **Stuck modifiers**: Exit and re-enter layer to reset; modifiers auto-release on layer exit
 - **Other keys affected**: Modifiers are only registered when encoder is rotated, not on layer entry
 - **Fallback to base behavior**: No encoder maps used; all behavior defined in callback function
+
+### Function call issues
+- **Undo/redo not working**: Ensure `tap_code16()` is used for `U_UND`/`U_RDO` (contain modifiers)
+- **Basic keys not working**: Use `tap_code()` for simple keycodes like volume, media controls
+- **RGB not responding**: Use direct RGB matrix functions, not `tap_code()` with RGB keycodes
 
 ### Compilation errors
 - Ensure using CRKBD v4.1 variant (not rev1)
