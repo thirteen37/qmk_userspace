@@ -66,6 +66,7 @@ qmk_userspace/
 - Define custom keycodes with descriptive names
 - Group related functionality in layers
 - Document layer purposes in comments
+- Use the latest keycodes. Prefer the shorter aliases.
 
 ### Configuration Management
 - Use `config.h` for compile-time settings
@@ -91,12 +92,6 @@ qmk_userspace/
 - Use QMK's built-in functions over custom implementations
 
 ## Hardware Considerations
-
-### Keyboard Types
-- Support various layouts: ortholinear, staggered, split, etc.
-- Account for different switch types and actuation
-- Consider physical constraints when designing keymaps
-- Test on actual hardware, not just simulation
 
 ### MCU and Memory
 - Be mindful of flash and RAM limitations
@@ -137,14 +132,9 @@ qmk_userspace/
 - Explain complex custom behaviors
 - Include build instructions
 - Maintain changelog for significant updates
+- Prefer the README file for long documentation and avoid putting it in the code
 
 ## Security and Privacy
-
-### Sensitive Information
-- Never commit passwords or API keys
-- Use environment variables or local config files
-- Be careful with macro content that might contain sensitive data
-- Consider privacy implications of logged keystrokes
 
 ## Integration with QMK Ecosystem
 
@@ -184,6 +174,7 @@ qmk_userspace/
 
 ### Feature Selection
 - Enable only needed features to save memory
+- Check what features are enabled and configured in the default `qmk_firmware` and don't duplicate them
 - Use conditional compilation for optional features
 - Balance functionality with resource constraints
 - Consider battery life for wireless keyboards
@@ -195,9 +186,11 @@ qmk_userspace/
 2. Test existing functionality
 3. Plan changes in logical increments
 4. Consider impact on other keyboards/keymaps
+5. Do not remove existing code without confirmation
+6. Do not create new files without confirmation
 
 ### After Making Changes
-1. Compile and test thoroughly
+1. Compile and test thoroughly using the QMK CLI
 2. Update documentation as needed
 3. Commit changes with clear messages
 4. Verify no regression in existing functionality
@@ -236,7 +229,6 @@ qmk_userspace/
 3. Test thoroughly on actual hardware
 4. Document configurations and custom behaviors
 5. Follow QMK community standards and conventions
-6. Keep sensitive information out of version control
 7. Use QMK's built-in features before writing custom code
 8. Consider memory and performance constraints
 9. Maintain clean, readable, and well-commented code

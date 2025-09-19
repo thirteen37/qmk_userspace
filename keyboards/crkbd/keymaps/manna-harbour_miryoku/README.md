@@ -1,6 +1,6 @@
-# CRKBD v4.1 Miryoku Encoder Configuration
+# CRKBD v4.1 Miryoku Contextual Encoder Configuration
 
-This keymap adds comprehensive encoder support to the Miryoku layout for the CRKBD v4.1 keyboard with contextual functionality across all layers. All encoder behavior is handled through a single callback function for precise control and enhanced app/tab switching with modifier hold logic. Note this only works with the `rev4_1` versions, in either the mini or standard variants.
+This keymap adds comprehensive contextual encoder support to the Miryoku layout for the CRKBD v4.1 keyboard. The implementation provides three distinct behaviors per layer through encoder button states and contextual layer switching. Note this only works with the `rev4_1` versions, in either the mini or standard variants.
 
 ## Hardware Requirements
 
@@ -10,124 +10,232 @@ This keymap adds comprehensive encoder support to the Miryoku layout for the CRK
   - Left encoder: matrix position [0,0] (first encoder)
   - Right encoder: matrix position [2,0] (third encoder)
 
-## Comprehensive Encoder Implementation
+## Contextual Encoder System Overview
 
-All encoder behavior is handled through a single `encoder_update_user()` callback function, eliminating the complexity of encoder maps and providing complete control over functionality. The NUM and SYM layers feature enhanced app and tab switching with modifier hold logic:
+The contextual encoder system provides three distinct behaviors per layer:
 
-### How It Works
-1. **Single Callback**: All encoders handled by `encoder_update_user()` function - no encoder maps used
-2. **Layer Detection**: Function detects current layer and executes appropriate encoder behavior
-3. **Modifier Hold**: For NUM/SYM layers, modifiers are held only when encoder is rotated
-4. **Layer Exit**: When you exit the layer, any held modifiers are automatically released
+1. **Normal encoder rotation**: Standard behavior when no encoder buttons are held
+2. **Left encoder button held + rotation**: Enhanced contextual behavior
+3. **Right encoder button held + rotation**: Alternative contextual behavior
 
-### Benefits
-- **Simplified Architecture**: Single callback function handles all encoder behavior
-- **Smooth Navigation**: Rotate through multiple apps/tabs in one gesture
-- **No Interference**: Other keys in layers work normally (no unwanted modifiers)
-- **Precise Control**: Each layer has exactly defined encoder behavior
-- **Clean Implementation**: No encoder map complexity or conflicts
-- **Cross-Platform**: Uses standard shortcuts (CMD+Tab on macOS, CTRL+Tab for browsers)
+### Architecture
 
-### Usage Examples
-- **App Switching**: Hold NUM layer → rotate left encoder (CMD auto-held) → continue rotating → release layer
-- **Tab Switching**: Hold SYM layer → rotate left encoder (CTRL auto-held) → continue rotating → release layer
+The implementation uses QMK's built-in layer-tap (`LT`) functionality combined with "proxy layers":
+
+- `U_ENC_LEFT`: Active when left encoder button is held
+- `U_ENC_RIGHT`: Active when right encoder button is held
+
+### Pure LT Implementation
+
+The system leverages QMK's proven `LT` (Layer-Tap) functionality exclusively:
+- **Tap behavior**: Encoder buttons act as Enter (left) and Space (right)
+- **Hold behavior**: Activates proxy layers for contextual encoder rotation
+- **No custom timing**: QMK handles tap vs hold detection automatically
+- **Simplified architecture**: ~60 lines of code eliminated from previous versions
+
+### Smart Modifier Management
+
+Enhanced state tracking manages:
+- Modifier hold states for app switching and tab switching
+- Encoder button hold detection through proxy layers
+- Base layer context preservation during proxy activation
+- Automatic modifier cleanup on layer transitions
+
+## Platform Adaptation
+
+The implementation adapts to different platforms through compile-time configuration:
+
+### macOS (`MIRYOKU_CLIPBOARD_MAC`)
+- Browser navigation: `CMD+[` / `CMD+]`
+- App switching: `CMD+Tab` / `CMD+Shift+Tab`
+- Window switching: `CMD+`` / `CMD+Shift+``
+- Tab switching: `CTRL+Tab` / `CTRL+Shift+Tab`
+
+### Windows/Linux (Default)
+- Browser navigation: Media keys (`KC_WBAK` / `KC_WFWD`)
+- App switching: `ALT+Tab` / `ALT+Shift+Tab`
+- Tab switching: `CTRL+Tab` / `CTRL+Shift+Tab`
+
+## Comprehensive Encoder Behaviors
+
+All encoder behavior is handled through a single `encoder_update_user()` callback function with contextual layer detection. The system automatically determines the effective layer context and provides appropriate behaviors.
+
+### Enhanced Summary Table
+
+| Layer | Left Encoder (Normal) | Left Encoder (Left Btn Held) | Left Encoder (Right Btn Held) | Right Encoder (Normal) | Right Encoder (Left Btn Held) | Right Encoder (Right Btn Held) |
+|-------|---------------------|---------------------------|------------------------------|----------------------|---------------------------|-------------------------------|
+| **Base/Extra/Tap** | Volume Control | Window Management (CMD+` / ALT+Tab) | Text Navigation (Word Jump) | Vertical Scroll | Window Management (CMD+` / ALT+Tab) | Page Navigation (PgUp/PgDn) |
+| **Button** | Browser Forward/Back | *[Base Layer Context]* | *[Base Layer Context]* | Undo/Redo | *[Base Layer Context]* | *[Base Layer Context]* |
+| **Nav** | Left/Right Cursor | Word Navigation (Ctrl+Arrow) | *[Text Selection]* | Undo/Redo | Word Navigation (Ctrl+Arrow) | *[Text Selection & Manipulation]* |
+| **Mouse** | Horizontal Scroll | *[Mouse Acceleration]* | Advanced Mouse Wheel | Vertical Scroll | *[Mouse Acceleration]* | Advanced Mouse Wheel & Accel |
+| **Media** | Volume Control | *[Playback Enhancement]* | Playlist Navigation | Track Prev/Next | *[Playback Enhancement]* | Playback Speed Control |
+| **Num** | App Switching (Enhanced) | App Switching (Platform Modifier Held) | *[Numeric Enhancement]* | Vertical Scroll | Number Input Sequences | *[Numeric Enhancement]* |
+| **Sym** | Tab Switching (Enhanced) | Recent Tabs Management | Text Selection (Word-by-Word) | Vertical Scroll | Recent Tabs Management | Text Selection (Word-by-Word) |
+| **Fun** | RGB Animation (Direct) | *[Advanced RGB Controls]* | *[System Function Controls]* | RGB Brightness (Direct) | *[Advanced RGB Controls]* | *[System Function Controls]* |
+
+*Note: Behaviors marked with [brackets] represent contextual enhancements that adapt based on the base layer and current context.*
+
+### Key Implementation Features
+
+#### Single Callback Architecture
+- `encoder_update_user()` function handles ALL encoder behavior for every layer
+- `get_encoder_context_layer()` determines effective layer context
+- Context preservation during proxy layer activation
+- No encoder maps used - complete control through callback
+
+#### Modifier Hold Logic
+For NUM and SYM layers with enhanced app/tab switching:
+1. **Layer Entry**: No modifiers held initially
+2. **Encoder Rotation**: Modifier automatically held during rotation
+3. **Continuous Rotation**: Smooth multi-step navigation
+4. **Layer Exit**: Modifiers automatically released
+
+#### Context-Aware Behavior
+- Proxy layers (`U_ENC_LEFT`, `U_ENC_RIGHT`) provide contextual markers
+- Base layer context preserved during encoder button holds
+- `layer_state_set_user()` manages state transitions and cleanup
+- Different behaviors activate based on combination of base layer and button state
 
 ## Undo/Redo Functionality
 
-The navigation and button layers feature undo/redo on the right encoder using Miryoku's clipboard system (`U_UND`/`U_RDO`). These automatically adapt to your operating system:
+The navigation and button layers feature undo/redo using Miryoku's clipboard system (`U_UND`/`U_RDO`):
 
-- **Linux/Default**: Uses `Ctrl+Z` (undo) and `Ctrl+Shift+Z` (redo)
-- **macOS**: Uses `Cmd+Z` (undo) and `Cmd+Shift+Z` (redo) 
-- **Windows**: Uses `Ctrl+Z` (undo) and `Ctrl+Y` (redo)
-
-The clipboard system is configured in the Miryoku userspace configuration.
-
-## Quick Reference Table
-
-| Layer | Left Encoder | Right Encoder |
-|-------|-------------|---------------|
-| Base/Extra/Tap | Volume | Vertical Scroll |
-| Button | Browser Forward/Back (CMD+]/[) | Undo/Redo |
-| Nav | Left/Right Cursor | Undo/Redo |
-| Mouse | Horizontal Scroll | Vertical Scroll |
-| Media | Volume | Track Prev/Next |
-| Num | App Switching (Enhanced) | Vertical Scroll |
-| Sym | Tab Switching (Enhanced) | Vertical Scroll |
-| Fun | RGB Animation (Direct) | RGB Brightness (Direct) |
+- **Linux/Default**: `Ctrl+Z` (undo) and `Ctrl+Shift+Z` (redo)
+- **macOS**: `Cmd+Z` (undo) and `Cmd+Shift+Z` (redo) 
+- **Windows**: `Ctrl+Z` (undo) and `Ctrl+Y` (redo)
 
 ## Configuration Files
 
 ### keymap.c
-Contains comprehensive encoder behavior implementation through callback functions:
+Contains comprehensive contextual encoder implementation:
 
-**Comprehensive Encoder Logic**: 
-- `encoder_update_user()` function handles ALL encoder behavior for every layer
-- Each layer has specific encoder behaviors implemented in a switch statement
-- App/tab switching uses modifier hold logic for smooth multi-step navigation
-- RGB matrix controls use direct function calls (`rgb_matrix_step()`, `rgb_matrix_increase_val()`, etc.)
-- `layer_state_set_user()` function cleans up held modifiers when layers are exited
-- Uses different function types for different keycodes:
-  - `tap_code()`: Basic keycodes (volume, media, scrolling, page navigation)
-  - `tap_code16()`: Keycodes with modifiers (undo/redo, app/tab switching)
+**Core Functions**:
+- `encoder_update_user()`: Central encoder behavior dispatcher with context detection
+- `layer_state_set_user()`: Base layer capture and modifier state management  
+- `get_encoder_context_layer()`: Determines effective layer for encoder behavior
+- Uses different function types optimally:
+  - `tap_code()`: Basic keycodes (volume, media, scrolling)
+  - `tap_code16()`: Keycodes with modifiers (undo/redo, navigation)
   - Direct functions: RGB matrix controls for immediate effect
-- Single source of truth for all encoder functionality
+
+**Encoder Button Mapping**:
+- Left encoder button: `LT(U_ENC_LEFT, KC_ENT)` - Enter on tap, proxy layer on hold
+- Right encoder button: `LT(U_ENC_RIGHT, KC_SPC)` - Space on tap, proxy layer on hold
 
 ### config.h
-- Maps the Miryoku layout to `LAYOUT_split_3x6_3_ex2` to utilize extra key positions
+- Maps Miryoku layout to `LAYOUT_split_3x6_3_ex2` for extra key positions
 - Sets encoder resolution to 2 for smooth operation
-- Extra key positions have `KC_CAPS` placeholders (overridden by hardware encoders)
+- Configures encoder positions and proxy layer definitions
 
 ### rules.mk
-- Enables RGB matrix support for the 46 LEDs on CRKBD v4.1
+- Enables RGB matrix support for 46 LEDs on CRKBD v4.1
 - Configures split keyboard features
+- **Important**: `ENCODER_MAP_ENABLE` is NOT set (uses callback instead)
+
+## Hardware Compatibility
+
+### Standard CRKBD (rev1, rev4_0)
+- Basic encoder rotation support only
+- No encoder button functionality
+- Uses `LAYOUT_split_3x6_3` with `WS2812_DRIVER = bitbang`
+
+### CRKBD v4.1 (standard/mini)  
+- Full contextual encoder support with button functionality
+- Uses `LAYOUT_split_3x6_3_ex2` with `WS2812_DRIVER = vendor`
+- Encoder buttons in top extra positions provide tap/hold functionality
 
 ## Installation
 
-1. Ensure your CRKBD v4.1 has encoders soldered in the top extra key positions
+1. Ensure your CRKBD v4.1 has encoders with buttons soldered in top extra positions
 2. Compile the firmware:
    ```bash
    qmk compile -kb crkbd/rev4_1/standard -km manna-harbour_miryoku
    ```
 3. Flash the resulting `crkbd_rev4_1_standard_manna-harbour_miryoku.uf2` file to both halves
 
-## Hardware Notes
+## Usage Examples
 
-- The CRKBD v4.1 supports up to 4 encoders (2 per side)
-- This configuration uses only 2 encoders (left and right) for maximum compatibility
-- Middle extra key positions remain available for future encoder expansion
-- Uses newer mouse wheel codes (`MS_WHL*`) for improved compatibility
-- Encoder resolution is set to 2 for balanced responsiveness
-- Both halves must be flashed with the same firmware
+### Enhanced App Switching (NUM Layer)
+1. Hold NUM layer key
+2. Rotate left encoder: Next/previous app with modifier auto-held
+3. Hold left encoder button + rotate: App switching with platform modifier held (CMD on Mac, ALT on Windows/Linux)
+4. Release layer: All modifiers automatically cleaned up
+
+### Contextual Navigation Examples
+
+#### Word Navigation (NAV Layer + Left Encoder Button)
+1. Hold NAV layer key + left encoder button
+2. Rotate left encoder: Jump by words (CTRL+Left/Right Arrow)
+3. Normal NAV + left encoder: Character-by-character movement
+4. Release encoder button: Return to character navigation
+
+#### Text Navigation (Base Layer + Right Encoder Button)
+1. Hold right encoder button (activates `U_ENC_RIGHT` proxy layer)
+2. Rotate left encoder: Jump by words (CTRL+Arrow)
+3. Rotate right encoder: Navigate by pages (Page Up/Down)
+4. Release button: Return to normal scroll behavior
+
+### Advanced RGB Control (FUN Layer + Encoder Buttons)
+1. Hold FUN layer key + encoder button
+2. Left button held: Advanced RGB pattern controls
+3. Right button held: System function controls
+4. Normal rotation: Standard RGB animation/brightness
 
 ## Troubleshooting
 
-### Encoders not responding
-- Check encoder wiring and solder connections
-- Verify that `ENCODER_MAP_ENABLE` is NOT set in rules.mk (we use callback instead)
-- Ensure correct keyboard variant: `crkbd/rev4_1/standard`
-- Check that `encoder_update_user()` function is present and returning `false`
+### Contextual Behaviors Not Working
+- **Encoder buttons not responding**: Verify CRKBD v4.1 hardware and `LAYOUT_split_3x6_3_ex2` mapping
+- **Context not switching**: Check `get_encoder_context_layer()` function and proxy layer definitions
+- **Base layer context lost**: Verify `layer_state_set_user()` captures base layer on proxy activation
 
-### Wrong encoder behavior
-- Verify layer is correctly activated
-- Check encoder logic in `encoder_update_user()` function for the specific layer
-- Encoder direction can be swapped by changing clockwise/counter-clockwise logic
-- No encoder maps are used - all behavior is handled in callback function
-- Uses modern mouse wheel codes (`MS_WHLU`, `MS_WHLD`, `MS_WHLL`, `MS_WHLR`)
+### Standard Encoder Issues
+- **No response**: Check encoder wiring, ensure `ENCODER_MAP_ENABLE` is NOT set
+- **Wrong direction**: Modify clockwise/counter-clockwise logic in `encoder_update_user()`
+- **Modifiers stuck**: Exit and re-enter layer; check modifier cleanup in `layer_state_set_user()`
 
-### App/Tab switching issues
-- **Modifiers not held**: Check `encoder_update_user()` and `layer_state_set_user()` functions are present
-- **Switching too fast**: Encoder sends discrete Tab presses, speed depends on rotation rate
-- **Wrong direction**: Check clockwise/counter-clockwise logic in `encoder_update_user()` switch statement
-- **Stuck modifiers**: Exit and re-enter layer to reset; modifiers auto-release on layer exit
-- **Other keys affected**: Modifiers are only registered when encoder is rotated, not on layer entry
-- **Fallback to base behavior**: No encoder maps used; all behavior defined in callback function
+### Layer-Tap Issues
+- **Buttons not tapping Enter/Space**: Verify `LT()` configuration in keymap
+- **Hold not activating proxy layers**: Check `U_ENC_LEFT`/`U_ENC_RIGHT` layer definitions
+- **Timing issues**: QMK handles timing automatically - check for conflicting custom timing code
 
-### Function call issues
-- **Undo/redo not working**: Ensure `tap_code16()` is used for `U_UND`/`U_RDO` (contain modifiers)
-- **Basic keys not working**: Use `tap_code()` for simple keycodes like volume, media controls
-- **RGB not responding**: Use direct RGB matrix functions, not `tap_code()` with RGB keycodes
+### Compilation Issues
+- **Memory constraints**: Current implementation uses ~99% of AVR memory on some revisions
+- **Layout errors**: Ensure using `LAYOUT_split_3x6_3_ex2` for v4.1
+- **Missing dependencies**: Verify all Miryoku userspace components are present
 
-### Compilation errors
-- Ensure using CRKBD v4.1 variant (not rev1)
-- Check that `LAYOUT_split_3x6_3_ex2` is defined in config.h
-- Verify all Miryoku dependencies are present in userspace
+## Technical Implementation Details
+
+### QMK APIs Used
+- `encoder_update_user()`: Core encoder callback with context detection
+- `layer_state_set_user()`: State management and base layer capture  
+- `get_highest_layer()`: Layer state queries
+- `layer_state_cmp()`: Layer state comparisons
+- `register_mods()` / `unregister_mods()`: Modifier management
+- `LT()`: Built-in layer-tap functionality for encoder buttons
+
+### Memory Efficiency
+- Single state structure manages all encoder behavior
+- Conditional compilation for revision-specific features
+- Optimized for microcontroller memory constraints
+- Pure LT implementation reduces code complexity significantly
+
+### Performance Considerations
+- Encoder callbacks optimized for frequent rotation events
+- Direct RGB matrix functions for immediate visual feedback
+- Minimal processing overhead in context detection
+- No custom timing functions needed (QMK handles LT timing)
+
+## Future Enhancements
+
+### Potential Improvements
+- User-configurable rotation behaviors per layer
+- Application-specific encoder mappings based on active window
+- Dynamic sensitivity adjustment
+- Audio feedback for encoder state changes
+
+### Framework Expansion
+- Generic contextual encoder framework for other keyboards
+- Runtime configuration system for behavior changes
+- Integration with other QMK advanced features like combos and tap dance
+
+This implementation demonstrates advanced QMK techniques including contextual layer management, state tracking, platform adaptation, and hardware abstraction, providing a robust foundation for sophisticated encoder behavior in any QMK-powered keyboard.

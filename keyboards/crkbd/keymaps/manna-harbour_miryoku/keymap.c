@@ -33,50 +33,84 @@
   #define U_TAB_MOD MOD_BIT(KC_LCTL) // Tab switch modifier (CTRL, default)
 #endif
 
-// Comprehensive Encoder Behavior Implementation
+// Contextual Encoder Behavior Implementation using Pure QMK LT Functionality
 //
-// This implementation handles ALL encoder behavior through the encoder_update_user()
-// callback function, providing complete control over encoder functionality per layer.
-// No encoder maps are used - everything is handled in the callback.
+// This implementation provides contextual encoder behavior that changes based on:
+// 1. Current active layer (Base, Nav, Num, Sym, etc.)
+// 2. Encoder button hold state (using QMK's built-in LT functionality)
+//
+// Architecture:
+// - Uses QMK's LT (Layer-Tap) for encoder buttons: LT(U_ENC_LEFT, KC_ENT) and LT(U_ENC_RIGHT, KC_SPC)
+// - Proxy layers (U_ENC_LEFT, U_ENC_RIGHT) activate automatically when encoder buttons are held
+// - encoder_update_user() dispatches behavior based on current layer and context
+// - layer_state_set_user() captures base layer context and manages modifier states
 //
 // Enhanced App/Tab Switching:
-// NUM Layer: App switching with platform modifier+Tab
-// - Platform modifier (CMD on Mac, ALT on Windows/Linux) is held only when left encoder is rotated
-// - Each rotation sends Tab (forward) or Shift+Tab (backward)
-// - Platform modifier remains held until NUM layer is exited
+// NUM Layer: App switching with platform modifier held automatically
+// SYM Layer: Tab switching with CTRL modifier held automatically
 //
-// SYM Layer: Tab switching with CTRL+Tab
-// - CTRL key is held only when left encoder is rotated
-// - Each rotation sends Tab (forward) or Shift+Tab (backward)
-// - CTRL remains held until SYM layer is exited
+// Platform Adaptation:
+// - Mac: CMD+[/], CMD for apps, CTRL for tabs
+// - Windows/Linux: Media keys for browser, ALT for apps, CTRL for tabs
 //
-// All Other Layers:
-// Handled through encoder_update_user() with appropriate layer-specific behavior
-// including volume, scrolling, undo/redo, mouse acceleration, RGB controls, etc.
-//
-// Function Usage Notes:
-// - tap_code(): For basic keycodes (volume, media, page up/down, mouse wheel)
-// - tap_code16(): For keycodes with modifiers (undo/redo, app/tab switching)
-// - Direct functions: For RGB matrix controls (immediate effect)
+// Function Usage:
+// - tap_code(): Basic keycodes (volume, scroll, navigation)
+// - tap_code16(): Keycodes with modifiers (shortcuts, app switching)
+// - Direct RGB functions: Immediate visual feedback
 
-// State tracking for modifier hold behavior
+// Minimal state tracking for contextual encoder behavior
+// QMK's LT functionality handles encoder button detection automatically
 typedef struct {
-    bool app_switching_active;    // Platform modifier held for app switching on NUM layer
-    bool tab_switching_active;    // CTRL held for tab switching on SYM layer
-} modifier_state_t;
+    bool app_switching_active;       // Platform modifier held for app switching on NUM layer
+    bool tab_switching_active;       // CTRL held for tab switching on SYM layer
+    uint8_t base_layer;              // The base layer when encoder proxy layer was activated
+} encoder_state_t;
 
-static modifier_state_t mod_state = {false, false};
+static encoder_state_t enc_state = {false, false, 0};
 
-// Encoder layer-tap functionality - only available on rev4_1 with clickable encoders
-#if defined(KEYBOARD_crkbd_rev4_1_standard) || defined(KEYBOARD_crkbd_rev4_1_mini)
-
-// Custom encoder layers - defined after Miryoku layers
+// Encoder proxy layers - activated automatically by QMK's LT functionality
+// Available on rev4.1 with encoder buttons, no-op on standard revisions
 enum custom_encoder_layers {
-    U_ENC_LEFT = U_FUN + 1,     // Layer when left encoder button is held
-    U_ENC_RIGHT,                // Layer when right encoder button is held
+    U_ENC_LEFT = U_FUN + 1,     // Proxy layer activated by LT(U_ENC_LEFT, KC_ENT)
+    U_ENC_RIGHT,                // Proxy layer activated by LT(U_ENC_RIGHT, KC_SPC)
 };
 
-#endif // rev4_1 encoder support
+
+// Helper function to get the contextual layer for encoder behavior
+uint8_t get_encoder_context_layer(void) {
+    uint8_t highest = get_highest_layer(layer_state);
+
+    // If we're in an encoder proxy layer, use the base layer for context
+    if (highest == U_ENC_LEFT || highest == U_ENC_RIGHT) {
+        return enc_state.base_layer;
+    }
+
+    return highest;
+}
+
+layer_state_t layer_state_set_user(layer_state_t state) {
+    // Capture base layer context when encoder proxy layers are activated by LT
+    if (layer_state_cmp(state, U_ENC_LEFT) || layer_state_cmp(state, U_ENC_RIGHT)) {
+        // Only update base layer if we're transitioning INTO a proxy layer
+        if (!layer_state_cmp(layer_state, U_ENC_LEFT) && !layer_state_cmp(layer_state, U_ENC_RIGHT)) {
+            enc_state.base_layer = get_highest_layer(layer_state);
+        }
+    }
+
+    // Release app switch modifier if NUM layer is no longer active and we were app switching
+    if (!layer_state_cmp(state, U_NUM) && enc_state.app_switching_active) {
+        unregister_mods(U_APP_MOD);
+        enc_state.app_switching_active = false;
+    }
+
+    // Release tab switch modifier if SYM layer is no longer active and we were tab switching
+    if (!layer_state_cmp(state, U_SYM) && enc_state.tab_switching_active) {
+        unregister_mods(U_TAB_MOD);
+        enc_state.tab_switching_active = false;
+    }
+
+    return state;
+}
 
 // Chordal hold layout - conditional based on revision
 #if defined(KEYBOARD_crkbd_rev4_1_standard) || defined(KEYBOARD_crkbd_rev4_1_mini)
@@ -97,45 +131,122 @@ const char chordal_hold_layout[MATRIX_ROWS][MATRIX_COLS] PROGMEM =
     );
 #endif
 
-// All encoder behavior handled by encoder_update_user() callback function below
+// All encoder behavior handled by encoder_update_user() with automatic LT proxy layer activation
 
 bool encoder_update_user(uint8_t index, bool clockwise) {
-    // Get current layer
+    // Get current layer (may be proxy layer) and determine contextual behavior
     uint8_t current_layer = get_highest_layer(layer_state);
+    uint8_t context_layer = get_encoder_context_layer();
 
-    // Handle all encoder behavior based on current layer and encoder index
+    // Handle encoder behavior - proxy layers activated automatically by QMK's LT
     switch (current_layer) {
-#if defined(KEYBOARD_crkbd_rev4_1_standard) || defined(KEYBOARD_crkbd_rev4_1_mini)
         case U_ENC_LEFT:
-            // Custom behavior when left encoder button is held
-            if (index == 0) { // Left encoder rotation
-                // Example: Media controls
-                tap_code(clockwise ? KC_MNXT : KC_MPRV);
-            } else if (index == 2) { // Right encoder rotation  
-                // Example: RGB hue
-                if (clockwise) {
-                    rgb_matrix_increase_hue();
-                } else {
-                    rgb_matrix_decrease_hue();
-                }
+            // Enhanced contextual behavior when left encoder button is held (via LT)
+            switch (context_layer) {
+                case U_BASE:
+                case U_EXTRA:
+                case U_TAP:
+                    if (index == 0) { // Left encoder: Window management
+                        #if defined(MIRYOKU_CLIPBOARD_MAC)
+                        tap_code16(clockwise ? LGUI(KC_GRV) : LGUI(LSFT(KC_GRV))); // CMD+` for window switching
+                        #else
+                        tap_code16(clockwise ? LALT(KC_TAB) : LALT(LSFT(KC_TAB))); // ALT+Tab for window switching
+                        #endif
+                    } else if (index == 2) { // Right encoder: Workspace switching
+                        #if defined(MIRYOKU_CLIPBOARD_MAC)
+                        tap_code16(clockwise ? LCTL(KC_RGHT) : LCTL(KC_LEFT)); // CTRL+Arrow for workspace
+                        #else
+                        tap_code16(clockwise ? LGUI(KC_RGHT) : LGUI(KC_LEFT)); // WIN+Arrow for desktop
+                        #endif
+                    }
+                    break;
+
+                case U_NUM:
+                    if (index == 0) { // Left encoder: App switching with platform modifier held
+                        if (!enc_state.app_switching_active) {
+                            register_mods(U_APP_MOD);
+                            enc_state.app_switching_active = true;
+                        }
+                        if (clockwise) {
+                            tap_code(KC_TAB);
+                        } else {
+                            tap_code16(LSFT(KC_TAB));
+                        }
+                    } else if (index == 2) { // Right encoder: Number input
+                        static uint8_t num_sequence[] = {KC_0, KC_1, KC_2, KC_3, KC_4, KC_5, KC_6, KC_7, KC_8, KC_9};
+                        static uint8_t num_index = 0;
+                        num_index = clockwise ? (num_index + 1) % 10 : (num_index + 9) % 10;
+                        tap_code(num_sequence[num_index]);
+                    }
+                    break;
+
+                case U_SYM:
+                    if (index == 0) { // Left encoder: Recent tabs (browser)
+                        tap_code16(clockwise ? LCTL(LSFT(KC_TAB)) : LCTL(KC_TAB));
+                    } else if (index == 2) { // Right encoder: Text selection
+                        tap_code16(clockwise ? LSFT(KC_RGHT) : LSFT(KC_LEFT));
+                    }
+                    break;
+
+                case U_NAV:
+                    if (index == 0) { // Left encoder: Word-wise navigation
+                        tap_code16(clockwise ? LCTL(KC_RGHT) : LCTL(KC_LEFT)); // Word jump
+                    } else if (index == 2) { // Right encoder: Undo/redo
+                        tap_code16(clockwise ? U_RDO : U_UND);
+                    }
+                    break;
+
+                default:
+                    // Default behavior for other layers - same as base layer
+                    if (index == 0) { // Left encoder: Volume
+                        tap_code(clockwise ? KC_VOLU : KC_VOLD);
+                    } else if (index == 2) { // Right encoder: Vertical scroll
+                        tap_code(clockwise ? MS_WHLU : MS_WHLD);
+                    }
+                    break;
             }
             break;
-            
+
         case U_ENC_RIGHT:
-            // Custom behavior when right encoder button is held
-            if (index == 0) { // Left encoder rotation
-                // Example: RGB saturation
-                if (clockwise) {
-                    rgb_matrix_increase_sat();
-                } else {
-                    rgb_matrix_decrease_sat();
-                }
-            } else if (index == 2) { // Right encoder rotation
-                // Example: Mouse wheel horizontal
-                tap_code(clockwise ? MS_WHLR : MS_WHLL);
+            // Enhanced contextual behavior when right encoder button is held (via LT)
+            switch (context_layer) {
+                case U_BASE:
+                case U_EXTRA:
+                case U_TAP:
+                    if (index == 0) { // Left encoder: Text navigation
+                        tap_code16(clockwise ? LCTL(KC_RGHT) : LCTL(KC_LEFT)); // Word jump
+                    } else if (index == 2) { // Right encoder: Page navigation
+                        tap_code(clockwise ? KC_PGDN : KC_PGUP);
+                    }
+                    break;
+
+                case U_MOUSE:
+                    if (index == 0) { // Left encoder: Mouse acceleration
+                        // Adjust mouse movement speed
+                        tap_code(clockwise ? MS_ACL2 : MS_ACL0);
+                    } else if (index == 2) { // Right encoder: Mouse wheel horizontal
+                        tap_code(clockwise ? MS_WHLR : MS_WHLL);
+                    }
+                    break;
+
+                case U_MEDIA:
+                    if (index == 0) { // Left encoder: Playback speed (if supported)
+                        tap_code(clockwise ? KC_MFFD : KC_MRWD);
+                    } else if (index == 2) { // Right encoder: Playlist navigation
+                        tap_code16(clockwise ? LCTL(KC_MNXT) : LCTL(KC_MPRV));
+                    }
+                    break;
+
+                default:
+                    // Default behavior - same as base layer
+                    if (index == 0) { // Left encoder: Volume
+                        tap_code(clockwise ? KC_VOLU : KC_VOLD);
+                    } else if (index == 2) { // Right encoder: Vertical scroll
+                        tap_code(clockwise ? MS_WHLU : MS_WHLD);
+                    }
+                    break;
             }
             break;
-#endif // rev4_1 encoder support
 
         case U_BASE:
         case U_EXTRA:
@@ -181,9 +292,9 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
 
         case U_NUM:
             if (index == 0) { // Left encoder: App switching with platform modifier held
-                if (!mod_state.app_switching_active) {
+                if (!enc_state.app_switching_active) {
                     register_mods(U_APP_MOD);
-                    mod_state.app_switching_active = true;
+                    enc_state.app_switching_active = true;
                 }
                 if (clockwise) {
                     tap_code(KC_TAB);
@@ -197,9 +308,9 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
 
         case U_SYM:
             if (index == 0) { // Left encoder: Tab switching with platform modifier held
-                if (!mod_state.tab_switching_active) {
+                if (!enc_state.tab_switching_active) {
                     register_mods(U_TAB_MOD);
-                    mod_state.tab_switching_active = true;
+                    enc_state.tab_switching_active = true;
                 }
                 if (clockwise) {
                     tap_code(KC_TAB);
@@ -231,20 +342,4 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
     }
 
     return false; // Skip default encoder handling since we handle everything here
-}
-
-layer_state_t layer_state_set_user(layer_state_t state) {
-    // Release app switch modifier if NUM layer is no longer active and we were app switching
-    if (!layer_state_cmp(state, U_NUM) && mod_state.app_switching_active) {
-        unregister_mods(U_APP_MOD);
-        mod_state.app_switching_active = false;
-    }
-
-    // Release tab switch modifier if SYM layer is no longer active and we were tab switching
-    if (!layer_state_cmp(state, U_SYM) && mod_state.tab_switching_active) {
-        unregister_mods(U_TAB_MOD);
-        mod_state.tab_switching_active = false;
-    }
-
-    return state;
 }
