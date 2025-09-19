@@ -67,6 +67,19 @@ typedef struct {
 
 static modifier_state_t mod_state = {false, false};
 
+// Encoder layer-tap functionality - only available on rev4_1 with clickable encoders
+#if defined(KEYBOARD_crkbd_rev4_1_standard) || defined(KEYBOARD_crkbd_rev4_1_mini)
+
+// Custom encoder layers - defined after Miryoku layers
+enum custom_encoder_layers {
+    U_ENC_LEFT = U_FUN + 1,     // Layer when left encoder button is held
+    U_ENC_RIGHT,                // Layer when right encoder button is held
+};
+
+#endif // rev4_1 encoder support
+
+// Chordal hold layout - conditional based on revision
+#if defined(KEYBOARD_crkbd_rev4_1_standard) || defined(KEYBOARD_crkbd_rev4_1_mini)
 const char chordal_hold_layout[MATRIX_ROWS][MATRIX_COLS] PROGMEM =
     LAYOUT_split_3x6_3_ex2(
         'L', 'L', 'L', 'L', 'L', 'L', 'L',  'R', 'R', 'R', 'R', 'R', 'R', 'R',
@@ -74,7 +87,15 @@ const char chordal_hold_layout[MATRIX_ROWS][MATRIX_COLS] PROGMEM =
         'L', 'L', 'L', 'L', 'L', 'L',            'R', 'R', 'R', 'R', 'R', 'R',
                             'X', 'X', 'X',  'X', 'X', 'X'
     );
-
+#else
+const char chordal_hold_layout[MATRIX_ROWS][MATRIX_COLS] PROGMEM =
+    LAYOUT_split_3x6_3(
+        'L', 'L', 'L', 'L', 'L', 'L',  'R', 'R', 'R', 'R', 'R', 'R',
+        'L', 'L', 'L', 'L', 'L', 'L',  'R', 'R', 'R', 'R', 'R', 'R',
+        'L', 'L', 'L', 'L', 'L', 'L',  'R', 'R', 'R', 'R', 'R', 'R',
+                   'X', 'X', 'X',  'X', 'X', 'X'
+    );
+#endif
 
 // All encoder behavior handled by encoder_update_user() callback function below
 
@@ -84,6 +105,38 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
 
     // Handle all encoder behavior based on current layer and encoder index
     switch (current_layer) {
+#if defined(KEYBOARD_crkbd_rev4_1_standard) || defined(KEYBOARD_crkbd_rev4_1_mini)
+        case U_ENC_LEFT:
+            // Custom behavior when left encoder button is held
+            if (index == 0) { // Left encoder rotation
+                // Example: Media controls
+                tap_code(clockwise ? KC_MNXT : KC_MPRV);
+            } else if (index == 2) { // Right encoder rotation  
+                // Example: RGB hue
+                if (clockwise) {
+                    rgb_matrix_increase_hue();
+                } else {
+                    rgb_matrix_decrease_hue();
+                }
+            }
+            break;
+            
+        case U_ENC_RIGHT:
+            // Custom behavior when right encoder button is held
+            if (index == 0) { // Left encoder rotation
+                // Example: RGB saturation
+                if (clockwise) {
+                    rgb_matrix_increase_sat();
+                } else {
+                    rgb_matrix_decrease_sat();
+                }
+            } else if (index == 2) { // Right encoder rotation
+                // Example: Mouse wheel horizontal
+                tap_code(clockwise ? MS_WHLR : MS_WHLL);
+            }
+            break;
+#endif // rev4_1 encoder support
+
         case U_BASE:
         case U_EXTRA:
         case U_TAP:

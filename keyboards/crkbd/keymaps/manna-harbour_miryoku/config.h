@@ -15,13 +15,12 @@
 // - Middle right of left half (matrix [1,6])
 // - Middle left of right half (matrix [5,6])
 //
-// Current mapping for encoder positions:
-// - Top extra keys: KC_CAPS (placeholders for encoders 0 and 1)
-//   * Left encoder (0): Volume control on most layers, context-specific on others
-//   * Right encoder (1): Vertical scroll, undo/redo on nav/button/mouse, volume in media
-// - Middle extra keys: KC_CAPS (placeholders for encoders 2 and 3)
-// - Outer columns remain U_NU (unused) for maximum compatibility
+// Layout mapping is conditional based on CRKBD revision:
+// - rev4_1: Encoder buttons with layer-tap functionality in top extra positions
+// - Other revisions: Standard layout without encoder buttons
 //
+#if defined(KEYBOARD_crkbd_rev4_1_standard) || defined(KEYBOARD_crkbd_rev4_1_mini)
+// CRKBD v4.1 with encoder button support
 #define LAYOUT_miryoku( \
      K00, K01, K02, K03, K04,      K05, K06, K07, K08, K09, \
      K10, K11, K12, K13, K14,      K15, K16, K17, K18, K19, \
@@ -29,11 +28,11 @@
      N30, N31, K32, K33, K34,      K35, K36, K37, N38, N39 \
 ) \
 LAYOUT_split_3x6_3_ex2( \
-     U_NU, K00, K01, K02, K03, K04, KC_CAPS,     KC_CAPS, K05, K06, K07, K08, K09, U_NU, \
-     U_NU, K10, K11, K12, K13, K14, KC_CAPS,     KC_CAPS, K15, K16, K17, K18, K19, U_NU, \
-     U_NU, K20, K21, K22, K23, K24,                       K25, K26, K27, K28, K29, U_NU, \
-                         K32, K33, K34,                K35, K36, K37 \
+     U_NU, K00, K01, K02, K03, K04, LT(U_ENC_LEFT, KC_MUTE),     LT(U_ENC_RIGHT, KC_BTN3), K05, K06, K07, K08, K09, U_NU, \
+     U_NU, K10, K11, K12, K13, K14, KC_CAPS,       KC_CAPS, K15, K16, K17, K18, K19, U_NU, \
+     U_NU, K20, K21, K22, K23, K24,                         K25, K26, K27, K28, K29, U_NU, \
+                         K32, K33, K34,                  K35, K36, K37 \
 )
-
 // Miryoku configuration
 #define MIRYOKU_MAPPING LAYOUT_miryoku
+#endif
