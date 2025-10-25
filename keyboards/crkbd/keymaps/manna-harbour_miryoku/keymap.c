@@ -49,21 +49,13 @@
   #define U_WORKSPACE_CCW LGUI(KC_LEFT) // Workspace switch counter-clockwise (WIN+Left, default)
 #endif
 
-// Contextual Encoder Behavior Implementation using Pure QMK LT Functionality
+// Contextual Encoder Behavior Implementation
 //
-// This implementation provides contextual encoder behavior that changes based on:
-// 1. Current active layer (Base, Nav, Num, Sym, etc.)
-// 2. Encoder button hold state (using QMK's built-in LT functionality)
-//
-// Architecture:
+// Simplified architecture:
 // - Uses QMK's LT (Layer-Tap) for encoder buttons: LT(U_ENC_LEFT, KC_ENT) and LT(U_ENC_RIGHT, KC_SPC)
+// - Each encoder button only affects its own encoder (left button for left encoder, right for right)
 // - Proxy layers (U_ENC_LEFT, U_ENC_RIGHT) activate automatically when encoder buttons are held
-// - encoder_update_user() dispatches behavior based on current layer and context
-// - layer_state_set_user() captures base layer context and manages modifier states
-//
-// Enhanced App/Tab Switching:
-// NUM Layer: App switching with platform modifier held automatically
-// SYM Layer: Tab switching with CTRL modifier held automatically
+// - encoder_update_user() checks if we're on a proxy layer and dispatches accordingly
 //
 // Platform Adaptation:
 // - Mac: CMD+[/], CMD for apps, CTRL for tabs
@@ -74,8 +66,7 @@
 // - tap_code16(): Keycodes with modifiers (shortcuts, app switching)
 // - Direct RGB functions: Immediate visual feedback
 
-// Minimal state tracking for contextual encoder behavior
-// QMK's LT functionality handles encoder button detection automatically
+// State tracking for app/tab switching with held modifiers
 typedef struct {
     bool app_switching_active;       // Platform modifier held for app switching on NUM layer
     bool tab_switching_active;       // CTRL held for tab switching on SYM layer
@@ -85,41 +76,30 @@ typedef struct {
 static encoder_state_t enc_state = {false, false, 0};
 
 // Encoder proxy layers - activated automatically by QMK's LT functionality
-// Available on rev4.1 with encoder buttons, no-op on standard revisions
 enum custom_encoder_layers {
-    U_ENC_LEFT = U_FUN + 1,     // Proxy layer activated by LT(U_ENC_LEFT, KC_ENT)
-    U_ENC_RIGHT,                // Proxy layer activated by LT(U_ENC_RIGHT, KC_SPC)
+    U_ENC_LEFT = U_FUN + 1,     // Proxy layer activated by LT(U_ENC_LEFT, KC_ENT) - left encoder button
+    U_ENC_RIGHT,                // Proxy layer activated by LT(U_ENC_RIGHT, KC_SPC) - right encoder button
 };
 
-
-// Helper function to get the contextual layer for encoder behavior
-uint8_t get_encoder_context_layer(void) {
-    uint8_t highest = get_highest_layer(layer_state);
-
-    // If we're in an encoder proxy layer, use the base layer for context
-    if (highest == U_ENC_LEFT || highest == U_ENC_RIGHT) {
-        return enc_state.base_layer;
-    }
-
-    return highest;
-}
-
 layer_state_t layer_state_set_user(layer_state_t state) {
-    // Capture base layer context when encoder proxy layers are activated by LT
-    if (layer_state_cmp(state, U_ENC_LEFT) || layer_state_cmp(state, U_ENC_RIGHT)) {
-        // Only update base layer if we're transitioning INTO a proxy layer
-        if (!layer_state_cmp(layer_state, U_ENC_LEFT) && !layer_state_cmp(layer_state, U_ENC_RIGHT)) {
-            enc_state.base_layer = get_highest_layer(layer_state);
+    uint8_t highest = get_highest_layer(state);
+
+    // Capture base layer when entering an encoder proxy layer
+    if (highest == U_ENC_LEFT || highest == U_ENC_RIGHT) {
+        // Only capture if we weren't already in a proxy layer
+        uint8_t prev_highest = get_highest_layer(layer_state);
+        if (prev_highest != U_ENC_LEFT && prev_highest != U_ENC_RIGHT) {
+            enc_state.base_layer = prev_highest;
         }
     }
 
-    // Release app switch modifier if NUM layer is no longer active and we were app switching
+    // Release app switch modifier if NUM layer is no longer active
     if (!layer_state_cmp(state, U_NUM) && enc_state.app_switching_active) {
         unregister_mods(U_APP_MOD);
         enc_state.app_switching_active = false;
     }
 
-    // Release tab switch modifier if SYM layer is no longer active and we were tab switching
+    // Release tab switch modifier if SYM layer is no longer active
     if (!layer_state_cmp(state, U_SYM) && enc_state.tab_switching_active) {
         unregister_mods(U_TAB_MOD);
         enc_state.tab_switching_active = false;
@@ -143,7 +123,7 @@ const char chordal_hold_layout[MATRIX_ROWS][MATRIX_COLS] PROGMEM =
         'L', 'L', 'L', 'L', 'L', 'L',  'R', 'R', 'R', 'R', 'R', 'R',
         'L', 'L', 'L', 'L', 'L', 'L',  'R', 'R', 'R', 'R', 'R', 'R',
         'L', 'L', 'L', 'L', 'L', 'L',  'R', 'R', 'R', 'R', 'R', 'R',
-                   'X', 'X', 'X',  'X', 'X', 'X'
+                       'X', 'X', 'X',  'X', 'X', 'X'
     );
 #endif
 
@@ -244,129 +224,92 @@ static void handle_encoder_no_button(uint8_t index, bool clockwise, uint8_t curr
     }
 }
 
-// Handle encoder behavior when left encoder button is held
-static void handle_encoder_left_button(uint8_t index, bool clockwise, uint8_t context_layer) {
-    // Enhanced contextual behavior when left encoder button is held (via LT)
+// Handle left encoder when its button is held
+static void handle_left_encoder_with_button(bool clockwise, uint8_t context_layer) {
     switch (context_layer) {
         case U_BASE:
         case U_EXTRA:
         case U_TAP:
-            if (index == 0) { // Left encoder: Window management
-                tap_code16(clockwise ? U_WIN_SWITCH_CW : U_WIN_SWITCH_CCW);
-            } else if (index == 2) { // Right encoder: Workspace switching
-                tap_code16(clockwise ? U_WORKSPACE_CW : U_WORKSPACE_CCW);
-            }
+            // Window management
+            tap_code16(clockwise ? U_WIN_SWITCH_CW : U_WIN_SWITCH_CCW);
             break;
 
         case U_NUM:
-            if (index == 0) { // Left encoder: App switching with platform modifier held
-                if (!enc_state.app_switching_active) {
-                    register_mods(U_APP_MOD);
-                    enc_state.app_switching_active = true;
-                }
-                if (clockwise) {
-                    tap_code(KC_TAB);
-                } else {
-                    tap_code16(LSFT(KC_TAB));
-                }
-            } else if (index == 2) { // Right encoder: Number input
-                static uint8_t num_sequence[] = {KC_0, KC_1, KC_2, KC_3, KC_4, KC_5, KC_6, KC_7, KC_8, KC_9};
-                static uint8_t num_index = 0;
-                num_index = clockwise ? (num_index + 1) % 10 : (num_index + 9) % 10;
-                tap_code(num_sequence[num_index]);
+            // App switching with platform modifier held
+            if (!enc_state.app_switching_active) {
+                register_mods(U_APP_MOD);
+                enc_state.app_switching_active = true;
             }
+            tap_code16(clockwise ? KC_TAB : LSFT(KC_TAB));
             break;
 
         case U_SYM:
-            if (index == 0) { // Left encoder: Recent tabs (browser)
-                tap_code16(clockwise ? LCTL(LSFT(KC_TAB)) : LCTL(KC_TAB));
-            } else if (index == 2) { // Right encoder: Text selection
-                tap_code16(clockwise ? LSFT(KC_RGHT) : LSFT(KC_LEFT));
-            }
+            // Recent tabs (browser)
+            tap_code16(clockwise ? LCTL(KC_TAB) : LCTL(LSFT(KC_TAB)));
             break;
 
         case U_NAV:
-            if (index == 0) { // Left encoder: Word-wise navigation
-                tap_code16(clockwise ? LCTL(KC_RGHT) : LCTL(KC_LEFT)); // Word jump
-            } else if (index == 2) { // Right encoder: Undo/redo
-                tap_code16(clockwise ? U_RDO : U_UND);
-            }
+            // Word-wise navigation
+            tap_code16(clockwise ? LCTL(KC_RGHT) : LCTL(KC_LEFT));
             break;
 
         default:
-            // Default behavior for other layers - same as base layer
-            if (index == 0) { // Left encoder: Volume
-                tap_code(clockwise ? KC_VOLU : KC_VOLD);
-            } else if (index == 2) { // Right encoder: Vertical scroll
-                tap_code(clockwise ? MS_WHLU : MS_WHLD);
-            }
+            // Default: Volume
+            tap_code(clockwise ? KC_VOLU : KC_VOLD);
             break;
     }
 }
 
-// Handle encoder behavior when right encoder button is held
-static void handle_encoder_right_button(uint8_t index, bool clockwise, uint8_t context_layer) {
-    // Enhanced contextual behavior when right encoder button is held (via LT)
+// Handle right encoder when its button is held
+static void handle_right_encoder_with_button(bool clockwise, uint8_t context_layer) {
     switch (context_layer) {
         case U_BASE:
         case U_EXTRA:
         case U_TAP:
-            if (index == 0) { // Left encoder: Text navigation
-                tap_code16(clockwise ? LCTL(KC_RGHT) : LCTL(KC_LEFT)); // Word jump
-            } else if (index == 2) { // Right encoder: Page navigation
-                tap_code(clockwise ? KC_PGDN : KC_PGUP);
-            }
+            // Page navigation
+            tap_code(clockwise ? KC_PGDN : KC_PGUP);
             break;
 
         case U_MOUSE:
-            if (index == 0) { // Left encoder: Mouse acceleration
-                // Adjust mouse movement speed
-                tap_code(clockwise ? MS_ACL2 : MS_ACL0);
-            } else if (index == 2) { // Right encoder: Mouse wheel horizontal
-                tap_code(clockwise ? MS_WHLR : MS_WHLL);
-            }
+            // Mouse wheel horizontal
+            tap_code(clockwise ? MS_WHLR : MS_WHLL);
             break;
 
         case U_MEDIA:
-            if (index == 0) { // Left encoder: Playback speed (if supported)
-                tap_code(clockwise ? KC_MFFD : KC_MRWD);
-            } else if (index == 2) { // Right encoder: Playlist navigation
-                tap_code16(clockwise ? LCTL(KC_MNXT) : LCTL(KC_MPRV));
-            }
+            // Playlist navigation
+            tap_code16(clockwise ? LCTL(KC_MNXT) : LCTL(KC_MPRV));
             break;
 
         default:
-            // Default behavior - same as base layer
-            if (index == 0) { // Left encoder: Volume
-                tap_code(clockwise ? KC_VOLU : KC_VOLD);
-            } else if (index == 2) { // Right encoder: Vertical scroll
-                tap_code(clockwise ? MS_WHLU : MS_WHLD);
-            }
+            // Default: Vertical scroll
+            tap_code(clockwise ? MS_WHLU : MS_WHLD);
             break;
     }
 }
 
-// All encoder behavior handled by encoder_update_user() with automatic LT proxy layer activation
-
 bool encoder_update_user(uint8_t index, bool clockwise) {
-    // Get current layer (may be proxy layer) and determine contextual behavior
     uint8_t current_layer = get_highest_layer(layer_state);
-    uint8_t context_layer = get_encoder_context_layer();
 
-    // Handle encoder behavior - proxy layers activated automatically by QMK's LT
-    switch (current_layer) {
-        case U_ENC_LEFT:
-            handle_encoder_left_button(index, clockwise, context_layer);
-            break;
-
-        case U_ENC_RIGHT:
-            handle_encoder_right_button(index, clockwise, context_layer);
-            break;
-
-        default:
+    // Left encoder (index 0)
+    if (index == 0) {
+        if (current_layer == U_ENC_LEFT) {
+            // Left encoder button is held - use special behavior
+            handle_left_encoder_with_button(clockwise, enc_state.base_layer);
+        } else {
+            // No button held - use normal layer behavior
             handle_encoder_no_button(index, clockwise, current_layer);
-            break;
+        }
+    }
+    // Right encoder (index 2)
+    else if (index == 2) {
+        if (current_layer == U_ENC_RIGHT) {
+            // Right encoder button is held - use special behavior
+            handle_right_encoder_with_button(clockwise, enc_state.base_layer);
+        } else {
+            // No button held - use normal layer behavior
+            handle_encoder_no_button(index, clockwise, current_layer);
+        }
     }
 
-    return false; // Skip default encoder handling since we handle everything here
+    return false; // Skip default encoder handling
 }

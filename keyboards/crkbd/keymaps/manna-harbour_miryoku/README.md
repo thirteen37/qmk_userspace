@@ -12,18 +12,19 @@ This keymap adds comprehensive contextual encoder support to the Miryoku layout 
 
 ## Contextual Encoder System Overview
 
-The contextual encoder system provides three distinct behaviors per layer:
+The contextual encoder system provides two distinct behaviors per encoder per layer:
 
-1. **Normal encoder rotation**: Standard behavior when no encoder buttons are held
-2. **Left encoder button held + rotation**: Enhanced contextual behavior
-3. **Right encoder button held + rotation**: Alternative contextual behavior
+1. **Normal encoder rotation**: Standard behavior when encoder button is not held
+2. **Encoder button held + rotation**: Each encoder's button only affects that encoder
+
+**Key constraint**: Each encoder button only affects its own encoder. You cannot hold the left encoder button while rotating the right encoder (and vice versa). This hardware limitation allows for a much simpler implementation.
 
 ### Architecture
 
 The implementation uses QMK's built-in layer-tap (`LT`) functionality combined with "proxy layers":
 
-- `U_ENC_LEFT`: Active when left encoder button is held
-- `U_ENC_RIGHT`: Active when right encoder button is held
+- `U_ENC_LEFT`: Active when left encoder button is held (only affects left encoder)
+- `U_ENC_RIGHT`: Active when right encoder button is held (only affects right encoder)
 
 ### Pure LT Implementation
 
@@ -31,7 +32,7 @@ The system leverages QMK's proven `LT` (Layer-Tap) functionality exclusively:
 - **Tap behavior**: Encoder buttons act as Enter (left) and Space (right)
 - **Hold behavior**: Activates proxy layers for contextual encoder rotation
 - **No custom timing**: QMK handles tap vs hold detection automatically
-- **Simplified architecture**: ~60 lines of code eliminated from previous versions
+- **Simplified architecture**: Each encoder independently checks its own button state
 
 ### Smart Modifier Management
 
@@ -62,26 +63,27 @@ All encoder behavior is handled through a single `encoder_update_user()` callbac
 
 ### Enhanced Summary Table
 
-| Layer | Left Encoder (Normal) | Left Encoder (Left Btn Held) | Left Encoder (Right Btn Held) | Right Encoder (Normal) | Right Encoder (Left Btn Held) | Right Encoder (Right Btn Held) |
-|-------|---------------------|---------------------------|------------------------------|----------------------|---------------------------|-------------------------------|
-| **Base/Extra/Tap** | Volume Control | Window Management (CMD+` / ALT+Tab) | Text Navigation (Word Jump) | Vertical Scroll | Window Management (CMD+` / ALT+Tab) | Page Navigation (PgUp/PgDn) |
-| **Button** | Browser Forward/Back | *[Base Layer Context]* | *[Base Layer Context]* | Undo/Redo | *[Base Layer Context]* | *[Base Layer Context]* |
-| **Nav** | Left/Right Cursor | Word Navigation (Ctrl+Arrow) | *[Text Selection]* | Undo/Redo | Word Navigation (Ctrl+Arrow) | *[Text Selection & Manipulation]* |
-| **Mouse** | Horizontal Scroll | *[Mouse Acceleration]* | Advanced Mouse Wheel | Vertical Scroll | *[Mouse Acceleration]* | Advanced Mouse Wheel & Accel |
-| **Media** | Volume Control | *[Playback Enhancement]* | Playlist Navigation | Track Prev/Next | *[Playback Enhancement]* | Playback Speed Control |
-| **Num** | App Switching (Enhanced) | App Switching (Platform Modifier Held) | *[Numeric Enhancement]* | Vertical Scroll | Number Input Sequences | *[Numeric Enhancement]* |
-| **Sym** | Tab Switching (Enhanced) | Recent Tabs Management | Text Selection (Word-by-Word) | Vertical Scroll | Recent Tabs Management | Text Selection (Word-by-Word) |
-| **Fun** | RGB Animation (Direct) | *[Advanced RGB Controls]* | *[System Function Controls]* | RGB Brightness (Direct) | *[Advanced RGB Controls]* | *[System Function Controls]* |
+| Layer | Left Encoder (Normal) | Left Encoder (Button Held) | Right Encoder (Normal) | Right Encoder (Button Held) |
+|-------|---------------------|---------------------------|----------------------|----------------------------|
+| **Base/Extra/Tap** | Volume Control | Window Management (CMD+` / ALT+Tab) | Vertical Scroll | Page Navigation (PgUp/PgDn) |
+| **Button** | Browser Forward/Back | Window Management | Undo/Redo | Page Navigation |
+| **Nav** | Left/Right Cursor | Word Navigation (Ctrl+Arrow) | Undo/Redo | Page Navigation |
+| **Mouse** | Horizontal Scroll | Volume Control | Vertical Scroll | Horizontal Scroll |
+| **Media** | Volume Control | Volume Control | Track Prev/Next | Playlist Navigation (Ctrl+Next/Prev) |
+| **Num** | App Switching (Enhanced) | App Switching (Platform Modifier Held) | Vertical Scroll | Vertical Scroll |
+| **Sym** | Tab Switching (Enhanced) | Recent Tabs (Ctrl+Tab) | Vertical Scroll | Vertical Scroll |
+| **Fun** | RGB Animation (Direct) | RGB Animation | RGB Brightness (Direct) | RGB Brightness |
 
-*Note: Behaviors marked with [brackets] represent contextual enhancements that adapt based on the base layer and current context.*
+*Note: Each encoder button only affects its own encoder - you cannot hold one encoder's button while rotating the other encoder.*
 
 ### Key Implementation Features
 
 #### Single Callback Architecture
 - `encoder_update_user()` function handles ALL encoder behavior for every layer
-- `get_encoder_context_layer()` determines effective layer context
-- Context preservation during proxy layer activation
+- Each encoder independently checks if its own button proxy layer is active
+- Context preservation during proxy layer activation via `enc_state.base_layer`
 - No encoder maps used - complete control through callback
+- Simplified logic: no cross-encoder button interactions
 
 #### Modifier Hold Logic
 For NUM and SYM layers with enhanced app/tab switching:
@@ -110,9 +112,11 @@ The navigation and button layers feature undo/redo using Miryoku's clipboard sys
 Contains comprehensive contextual encoder implementation:
 
 **Core Functions**:
-- `encoder_update_user()`: Central encoder behavior dispatcher with context detection
-- `layer_state_set_user()`: Base layer capture and modifier state management  
-- `get_encoder_context_layer()`: Determines effective layer for encoder behavior
+- `encoder_update_user()`: Central encoder behavior dispatcher - checks encoder index and current layer
+- `layer_state_set_user()`: Base layer capture and modifier state management
+- `handle_encoder_no_button()`: Handles normal encoder rotation without button held
+- `handle_left_encoder_with_button()`: Handles left encoder when left button is held
+- `handle_right_encoder_with_button()`: Handles right encoder when right button is held
 - Uses different function types optimally:
   - `tap_code()`: Basic keycodes (volume, media, scrolling)
   - `tap_code16()`: Keycodes with modifiers (undo/redo, navigation)
@@ -169,24 +173,26 @@ Contains comprehensive contextual encoder implementation:
 3. Normal NAV + left encoder: Character-by-character movement
 4. Release encoder button: Return to character navigation
 
-#### Text Navigation (Base Layer + Right Encoder Button)
+#### Page Navigation (Base Layer + Right Encoder Button)
 1. Hold right encoder button (activates `U_ENC_RIGHT` proxy layer)
-2. Rotate left encoder: Jump by words (CTRL+Arrow)
-3. Rotate right encoder: Navigate by pages (Page Up/Down)
-4. Release button: Return to normal scroll behavior
+2. Rotate right encoder: Navigate by pages (Page Up/Down)
+3. Release button: Return to normal scroll behavior
+4. Note: While holding right button, you can only affect the right encoder
 
 ### Advanced RGB Control (FUN Layer + Encoder Buttons)
-1. Hold FUN layer key + encoder button
-2. Left button held: Advanced RGB pattern controls
-3. Right button held: System function controls
-4. Normal rotation: Standard RGB animation/brightness
+1. Hold FUN layer key
+2. Left encoder (normal): RGB animation modes
+3. Left encoder (button held): Same as normal (RGB animation)
+4. Right encoder (normal): RGB brightness
+5. Right encoder (button held): Same as normal (RGB brightness)
 
 ## Troubleshooting
 
 ### Contextual Behaviors Not Working
 - **Encoder buttons not responding**: Verify CRKBD v4.1 hardware and `LAYOUT_split_3x6_3_ex2` mapping
-- **Context not switching**: Check `get_encoder_context_layer()` function and proxy layer definitions
+- **Context not switching**: Check proxy layer definitions and `encoder_update_user()` logic
 - **Base layer context lost**: Verify `layer_state_set_user()` captures base layer on proxy activation
+- **Wrong encoder affected**: Remember that each encoder button only affects its own encoder
 
 ### Standard Encoder Issues
 - **No response**: Check encoder wiring, ensure `ENCODER_MAP_ENABLE` is NOT set
@@ -222,8 +228,9 @@ Contains comprehensive contextual encoder implementation:
 ### Performance Considerations
 - Encoder callbacks optimized for frequent rotation events
 - Direct RGB matrix functions for immediate visual feedback
-- Minimal processing overhead in context detection
+- Minimal processing overhead: each encoder only checks its own button state
 - No custom timing functions needed (QMK handles LT timing)
+- Simplified logic reduces CPU cycles per encoder event
 
 ## Future Enhancements
 
