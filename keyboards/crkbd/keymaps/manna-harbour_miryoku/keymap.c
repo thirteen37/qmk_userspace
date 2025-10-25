@@ -16,21 +16,37 @@
   #define U_BCK KC_NO // Browser backward - not available in FUN mode
   #define U_APP_MOD MOD_BIT(KC_NO) // App switch modifier - not available in FUN mode
   #define U_TAB_MOD MOD_BIT(KC_NO) // Tab switch modifier - not available in FUN mode
+  #define U_WIN_SWITCH_CW KC_NO // Window switch clockwise - not available in FUN mode
+  #define U_WIN_SWITCH_CCW KC_NO // Window switch counter-clockwise - not available in FUN mode
+  #define U_WORKSPACE_CW KC_NO // Workspace switch clockwise - not available in FUN mode
+  #define U_WORKSPACE_CCW KC_NO // Workspace switch counter-clockwise - not available in FUN mode
 #elif defined (MIRYOKU_CLIPBOARD_MAC)
   #define U_FWD LGUI(KC_RBRC) // Browser forward
   #define U_BCK LGUI(KC_LBRC) // Browser backward
   #define U_APP_MOD MOD_BIT(KC_LGUI) // App switch modifier (CMD)
   #define U_TAB_MOD MOD_BIT(KC_LCTL) // Tab switch modifier (CTRL)
+  #define U_WIN_SWITCH_CW LGUI(KC_GRV) // Window switch clockwise (CMD+`)
+  #define U_WIN_SWITCH_CCW LGUI(LSFT(KC_GRV)) // Window switch counter-clockwise (CMD+SHIFT+`)
+  #define U_WORKSPACE_CW LCTL(KC_RGHT) // Workspace switch clockwise (CTRL+Right)
+  #define U_WORKSPACE_CCW LCTL(KC_LEFT) // Workspace switch counter-clockwise (CTRL+Left)
 #elif defined (MIRYOKU_CLIPBOARD_WIN)
   #define U_FWD KC_WFWD // Browser forward (media key)
   #define U_BCK KC_WBAK // Browser backward (media key)
   #define U_APP_MOD MOD_BIT(KC_LALT) // App switch modifier (ALT)
   #define U_TAB_MOD MOD_BIT(KC_LCTL) // Tab switch modifier (CTRL)
+  #define U_WIN_SWITCH_CW LALT(KC_TAB) // Window switch clockwise (ALT+Tab)
+  #define U_WIN_SWITCH_CCW LALT(LSFT(KC_TAB)) // Window switch counter-clockwise (ALT+SHIFT+Tab)
+  #define U_WORKSPACE_CW LGUI(KC_RGHT) // Workspace switch clockwise (WIN+Right)
+  #define U_WORKSPACE_CCW LGUI(KC_LEFT) // Workspace switch counter-clockwise (WIN+Left)
 #else
   #define U_FWD KC_WFWD // Browser forward (media key, default)
   #define U_BCK KC_WBAK // Browser backward (media key, default)
   #define U_APP_MOD MOD_BIT(KC_LALT) // App switch modifier (ALT, default)
   #define U_TAB_MOD MOD_BIT(KC_LCTL) // Tab switch modifier (CTRL, default)
+  #define U_WIN_SWITCH_CW LALT(KC_TAB) // Window switch clockwise (ALT+Tab, default)
+  #define U_WIN_SWITCH_CCW LALT(LSFT(KC_TAB)) // Window switch counter-clockwise (ALT+SHIFT+Tab, default)
+  #define U_WORKSPACE_CW LGUI(KC_RGHT) // Workspace switch clockwise (WIN+Right, default)
+  #define U_WORKSPACE_CCW LGUI(KC_LEFT) // Workspace switch counter-clockwise (WIN+Left, default)
 #endif
 
 // Contextual Encoder Behavior Implementation using Pure QMK LT Functionality
@@ -131,123 +147,9 @@ const char chordal_hold_layout[MATRIX_ROWS][MATRIX_COLS] PROGMEM =
     );
 #endif
 
-// All encoder behavior handled by encoder_update_user() with automatic LT proxy layer activation
-
-bool encoder_update_user(uint8_t index, bool clockwise) {
-    // Get current layer (may be proxy layer) and determine contextual behavior
-    uint8_t current_layer = get_highest_layer(layer_state);
-    uint8_t context_layer = get_encoder_context_layer();
-
-    // Handle encoder behavior - proxy layers activated automatically by QMK's LT
+// Handle encoder behavior when no encoder button is pressed
+static void handle_encoder_no_button(uint8_t index, bool clockwise, uint8_t current_layer) {
     switch (current_layer) {
-        case U_ENC_LEFT:
-            // Enhanced contextual behavior when left encoder button is held (via LT)
-            switch (context_layer) {
-                case U_BASE:
-                case U_EXTRA:
-                case U_TAP:
-                    if (index == 0) { // Left encoder: Window management
-                        #if defined(MIRYOKU_CLIPBOARD_MAC)
-                        tap_code16(clockwise ? LGUI(KC_GRV) : LGUI(LSFT(KC_GRV))); // CMD+` for window switching
-                        #else
-                        tap_code16(clockwise ? LALT(KC_TAB) : LALT(LSFT(KC_TAB))); // ALT+Tab for window switching
-                        #endif
-                    } else if (index == 2) { // Right encoder: Workspace switching
-                        #if defined(MIRYOKU_CLIPBOARD_MAC)
-                        tap_code16(clockwise ? LCTL(KC_RGHT) : LCTL(KC_LEFT)); // CTRL+Arrow for workspace
-                        #else
-                        tap_code16(clockwise ? LGUI(KC_RGHT) : LGUI(KC_LEFT)); // WIN+Arrow for desktop
-                        #endif
-                    }
-                    break;
-
-                case U_NUM:
-                    if (index == 0) { // Left encoder: App switching with platform modifier held
-                        if (!enc_state.app_switching_active) {
-                            register_mods(U_APP_MOD);
-                            enc_state.app_switching_active = true;
-                        }
-                        if (clockwise) {
-                            tap_code(KC_TAB);
-                        } else {
-                            tap_code16(LSFT(KC_TAB));
-                        }
-                    } else if (index == 2) { // Right encoder: Number input
-                        static uint8_t num_sequence[] = {KC_0, KC_1, KC_2, KC_3, KC_4, KC_5, KC_6, KC_7, KC_8, KC_9};
-                        static uint8_t num_index = 0;
-                        num_index = clockwise ? (num_index + 1) % 10 : (num_index + 9) % 10;
-                        tap_code(num_sequence[num_index]);
-                    }
-                    break;
-
-                case U_SYM:
-                    if (index == 0) { // Left encoder: Recent tabs (browser)
-                        tap_code16(clockwise ? LCTL(LSFT(KC_TAB)) : LCTL(KC_TAB));
-                    } else if (index == 2) { // Right encoder: Text selection
-                        tap_code16(clockwise ? LSFT(KC_RGHT) : LSFT(KC_LEFT));
-                    }
-                    break;
-
-                case U_NAV:
-                    if (index == 0) { // Left encoder: Word-wise navigation
-                        tap_code16(clockwise ? LCTL(KC_RGHT) : LCTL(KC_LEFT)); // Word jump
-                    } else if (index == 2) { // Right encoder: Undo/redo
-                        tap_code16(clockwise ? U_RDO : U_UND);
-                    }
-                    break;
-
-                default:
-                    // Default behavior for other layers - same as base layer
-                    if (index == 0) { // Left encoder: Volume
-                        tap_code(clockwise ? KC_VOLU : KC_VOLD);
-                    } else if (index == 2) { // Right encoder: Vertical scroll
-                        tap_code(clockwise ? MS_WHLU : MS_WHLD);
-                    }
-                    break;
-            }
-            break;
-
-        case U_ENC_RIGHT:
-            // Enhanced contextual behavior when right encoder button is held (via LT)
-            switch (context_layer) {
-                case U_BASE:
-                case U_EXTRA:
-                case U_TAP:
-                    if (index == 0) { // Left encoder: Text navigation
-                        tap_code16(clockwise ? LCTL(KC_RGHT) : LCTL(KC_LEFT)); // Word jump
-                    } else if (index == 2) { // Right encoder: Page navigation
-                        tap_code(clockwise ? KC_PGDN : KC_PGUP);
-                    }
-                    break;
-
-                case U_MOUSE:
-                    if (index == 0) { // Left encoder: Mouse acceleration
-                        // Adjust mouse movement speed
-                        tap_code(clockwise ? MS_ACL2 : MS_ACL0);
-                    } else if (index == 2) { // Right encoder: Mouse wheel horizontal
-                        tap_code(clockwise ? MS_WHLR : MS_WHLL);
-                    }
-                    break;
-
-                case U_MEDIA:
-                    if (index == 0) { // Left encoder: Playback speed (if supported)
-                        tap_code(clockwise ? KC_MFFD : KC_MRWD);
-                    } else if (index == 2) { // Right encoder: Playlist navigation
-                        tap_code16(clockwise ? LCTL(KC_MNXT) : LCTL(KC_MPRV));
-                    }
-                    break;
-
-                default:
-                    // Default behavior - same as base layer
-                    if (index == 0) { // Left encoder: Volume
-                        tap_code(clockwise ? KC_VOLU : KC_VOLD);
-                    } else if (index == 2) { // Right encoder: Vertical scroll
-                        tap_code(clockwise ? MS_WHLU : MS_WHLD);
-                    }
-                    break;
-            }
-            break;
-
         case U_BASE:
         case U_EXTRA:
         case U_TAP:
@@ -338,6 +240,131 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
                     rgb_matrix_decrease_val();
                 }
             }
+            break;
+    }
+}
+
+// Handle encoder behavior when left encoder button is held
+static void handle_encoder_left_button(uint8_t index, bool clockwise, uint8_t context_layer) {
+    // Enhanced contextual behavior when left encoder button is held (via LT)
+    switch (context_layer) {
+        case U_BASE:
+        case U_EXTRA:
+        case U_TAP:
+            if (index == 0) { // Left encoder: Window management
+                tap_code16(clockwise ? U_WIN_SWITCH_CW : U_WIN_SWITCH_CCW);
+            } else if (index == 2) { // Right encoder: Workspace switching
+                tap_code16(clockwise ? U_WORKSPACE_CW : U_WORKSPACE_CCW);
+            }
+            break;
+
+        case U_NUM:
+            if (index == 0) { // Left encoder: App switching with platform modifier held
+                if (!enc_state.app_switching_active) {
+                    register_mods(U_APP_MOD);
+                    enc_state.app_switching_active = true;
+                }
+                if (clockwise) {
+                    tap_code(KC_TAB);
+                } else {
+                    tap_code16(LSFT(KC_TAB));
+                }
+            } else if (index == 2) { // Right encoder: Number input
+                static uint8_t num_sequence[] = {KC_0, KC_1, KC_2, KC_3, KC_4, KC_5, KC_6, KC_7, KC_8, KC_9};
+                static uint8_t num_index = 0;
+                num_index = clockwise ? (num_index + 1) % 10 : (num_index + 9) % 10;
+                tap_code(num_sequence[num_index]);
+            }
+            break;
+
+        case U_SYM:
+            if (index == 0) { // Left encoder: Recent tabs (browser)
+                tap_code16(clockwise ? LCTL(LSFT(KC_TAB)) : LCTL(KC_TAB));
+            } else if (index == 2) { // Right encoder: Text selection
+                tap_code16(clockwise ? LSFT(KC_RGHT) : LSFT(KC_LEFT));
+            }
+            break;
+
+        case U_NAV:
+            if (index == 0) { // Left encoder: Word-wise navigation
+                tap_code16(clockwise ? LCTL(KC_RGHT) : LCTL(KC_LEFT)); // Word jump
+            } else if (index == 2) { // Right encoder: Undo/redo
+                tap_code16(clockwise ? U_RDO : U_UND);
+            }
+            break;
+
+        default:
+            // Default behavior for other layers - same as base layer
+            if (index == 0) { // Left encoder: Volume
+                tap_code(clockwise ? KC_VOLU : KC_VOLD);
+            } else if (index == 2) { // Right encoder: Vertical scroll
+                tap_code(clockwise ? MS_WHLU : MS_WHLD);
+            }
+            break;
+    }
+}
+
+// Handle encoder behavior when right encoder button is held
+static void handle_encoder_right_button(uint8_t index, bool clockwise, uint8_t context_layer) {
+    // Enhanced contextual behavior when right encoder button is held (via LT)
+    switch (context_layer) {
+        case U_BASE:
+        case U_EXTRA:
+        case U_TAP:
+            if (index == 0) { // Left encoder: Text navigation
+                tap_code16(clockwise ? LCTL(KC_RGHT) : LCTL(KC_LEFT)); // Word jump
+            } else if (index == 2) { // Right encoder: Page navigation
+                tap_code(clockwise ? KC_PGDN : KC_PGUP);
+            }
+            break;
+
+        case U_MOUSE:
+            if (index == 0) { // Left encoder: Mouse acceleration
+                // Adjust mouse movement speed
+                tap_code(clockwise ? MS_ACL2 : MS_ACL0);
+            } else if (index == 2) { // Right encoder: Mouse wheel horizontal
+                tap_code(clockwise ? MS_WHLR : MS_WHLL);
+            }
+            break;
+
+        case U_MEDIA:
+            if (index == 0) { // Left encoder: Playback speed (if supported)
+                tap_code(clockwise ? KC_MFFD : KC_MRWD);
+            } else if (index == 2) { // Right encoder: Playlist navigation
+                tap_code16(clockwise ? LCTL(KC_MNXT) : LCTL(KC_MPRV));
+            }
+            break;
+
+        default:
+            // Default behavior - same as base layer
+            if (index == 0) { // Left encoder: Volume
+                tap_code(clockwise ? KC_VOLU : KC_VOLD);
+            } else if (index == 2) { // Right encoder: Vertical scroll
+                tap_code(clockwise ? MS_WHLU : MS_WHLD);
+            }
+            break;
+    }
+}
+
+// All encoder behavior handled by encoder_update_user() with automatic LT proxy layer activation
+
+bool encoder_update_user(uint8_t index, bool clockwise) {
+    // Get current layer (may be proxy layer) and determine contextual behavior
+    uint8_t current_layer = get_highest_layer(layer_state);
+    uint8_t context_layer = get_encoder_context_layer();
+
+    // Handle encoder behavior - proxy layers activated automatically by QMK's LT
+    switch (current_layer) {
+        case U_ENC_LEFT:
+            handle_encoder_left_button(index, clockwise, context_layer);
+            break;
+
+        case U_ENC_RIGHT:
+            handle_encoder_right_button(index, clockwise, context_layer);
+            break;
+
+        default:
+            handle_encoder_no_button(index, clockwise, current_layer);
             break;
     }
 
