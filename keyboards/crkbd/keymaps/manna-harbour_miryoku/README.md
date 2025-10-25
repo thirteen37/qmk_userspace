@@ -29,7 +29,7 @@ The implementation uses QMK's built-in layer-tap (`LT`) functionality combined w
 ### Pure LT Implementation
 
 The system leverages QMK's proven `LT` (Layer-Tap) functionality exclusively:
-- **Tap behavior**: Encoder buttons act as Enter (left) and Space (right)
+- **Tap behavior**: Encoder buttons act as Mute (left) and Space (right)
 - **Hold behavior**: Activates proxy layers for contextual encoder rotation
 - **No custom timing**: QMK handles tap vs hold detection automatically
 - **Simplified architecture**: Each encoder independently checks its own button state
@@ -37,10 +37,11 @@ The system leverages QMK's proven `LT` (Layer-Tap) functionality exclusively:
 ### Smart Modifier Management
 
 Enhanced state tracking manages:
-- Modifier hold states for app switching and tab switching
+- Modifier hold states for window switching, app switching, and tab switching
 - Encoder button hold detection through proxy layers
 - Base layer context preservation during proxy activation
 - Automatic modifier cleanup on layer transitions
+- Platform-specific modifier selection (Alt on Base, CMD/Alt on NUM depending on platform)
 
 ## Platform Adaptation
 
@@ -65,14 +66,14 @@ All encoder behavior is handled through a single `encoder_update_user()` callbac
 
 | Layer | Left Encoder (Normal) | Left Encoder (Button Held) | Right Encoder (Normal) | Right Encoder (Button Held) |
 |-------|---------------------|---------------------------|----------------------|----------------------------|
-| **Base/Extra/Tap** | Volume Control | Window Management (CMD+` / ALT+Tab) | Vertical Scroll | Page Navigation (PgUp/PgDn) |
-| **Button** | Browser Forward/Back | Window Management | Undo/Redo | Page Navigation |
+| **Base/Extra/Tap** | Volume Control | Window Switching (Alt+Tab / Option+Tab) | Vertical Scroll | Page Navigation (PgUp/PgDn) |
+| **Button** | Browser Forward/Back | Window Switching (Alt+Tab) | Undo/Redo | Page Navigation |
 | **Nav** | Left/Right Cursor | Word Navigation (Ctrl+Arrow) | Undo/Redo | Page Navigation |
 | **Mouse** | Horizontal Scroll | Volume Control | Vertical Scroll | Horizontal Scroll |
 | **Media** | Volume Control | Volume Control | Track Prev/Next | Playlist Navigation (Ctrl+Next/Prev) |
-| **Num** | App Switching (Enhanced) | App Switching (Platform Modifier Held) | Vertical Scroll | Vertical Scroll |
+| **Num** | App Switching (Enhanced) | Window Management (CMD+` / ALT+Tab) | Vertical Scroll | Vertical Scroll |
 | **Sym** | Tab Switching (Enhanced) | Recent Tabs (Ctrl+Tab) | Vertical Scroll | Vertical Scroll |
-| **Fun** | RGB Animation (Direct) | RGB Animation | RGB Brightness (Direct) | RGB Brightness |
+| **Fun** | RGB Animation (Direct) | RGB Animation Speed | RGB Brightness (Direct) | RGB Hue |
 
 *Note: Each encoder button only affects its own encoder - you cannot hold one encoder's button while rotating the other encoder.*
 
@@ -123,7 +124,7 @@ Contains comprehensive contextual encoder implementation:
   - Direct functions: RGB matrix controls for immediate effect
 
 **Encoder Button Mapping**:
-- Left encoder button: `LT(U_ENC_LEFT, KC_ENT)` - Enter on tap, proxy layer on hold
+- Left encoder button: `LT(U_ENC_LEFT, KC_MUTE)` - Mute on tap, proxy layer on hold
 - Right encoder button: `LT(U_ENC_RIGHT, KC_SPC)` - Space on tap, proxy layer on hold
 
 ### config.h
@@ -159,10 +160,20 @@ Contains comprehensive contextual encoder implementation:
 
 ## Usage Examples
 
+### Window Switching (Base Layer + Left Encoder Button)
+1. Hold left encoder button (activates `U_ENC_LEFT` proxy layer)
+2. Rotate left encoder: Switch windows with Alt+Tab (Option+Tab on Mac)
+3. Alt modifier is automatically held while rotating
+4. **Release encoder button**: Alt modifier automatically released, selected window is activated
+
+This provides smooth window switching - the Alt modifier is held only while the encoder button is pressed, allowing you to quickly cycle through windows and release to select.
+
 ### Enhanced App Switching (NUM Layer)
 1. Hold NUM layer key
 2. Rotate left encoder: Next/previous app with modifier auto-held
-3. Hold left encoder button + rotate: App switching with platform modifier held (CMD on Mac, ALT on Windows/Linux)
+3. Hold left encoder button + rotate: Window management with platform modifier held
+   - **macOS**: CMD+` / CMD+Shift+` (switch windows within the same app)
+   - **Windows/Linux**: Alt+Tab / Alt+Shift+Tab (switch between all windows)
 4. Release layer: All modifiers automatically cleaned up
 
 ### Contextual Navigation Examples
@@ -182,9 +193,9 @@ Contains comprehensive contextual encoder implementation:
 ### Advanced RGB Control (FUN Layer + Encoder Buttons)
 1. Hold FUN layer key
 2. Left encoder (normal): RGB animation modes
-3. Left encoder (button held): Same as normal (RGB animation)
+3. Left encoder (button held): RGB animation speed
 4. Right encoder (normal): RGB brightness
-5. Right encoder (button held): Same as normal (RGB brightness)
+5. Right encoder (button held): RGB hue
 
 ## Troubleshooting
 

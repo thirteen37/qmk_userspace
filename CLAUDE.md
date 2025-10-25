@@ -180,11 +180,32 @@ For keyboards with rotary encoders (like CRKBD rev4.1), this codebase uses a sop
 **Architecture**:
 1. Use QMK's `LT()` (Layer-Tap) for encoder buttons
 2. Encoder buttons activate proxy layers when held
-3. `encoder_update_user()` checks which encoder and whether its button is held
-4. Separate handler functions for each state:
-   - `handle_encoder_no_button()` - Normal rotation
-   - `handle_left_encoder_with_button()` - Left encoder with its button held
-   - `handle_right_encoder_with_button()` - Right encoder with its button held
+3. Left encoder button: `LT(U_ENC_LEFT, KC_MUTE)` - Mute on tap, proxy layer on hold
+4. Right encoder button: `LT(U_ENC_RIGHT, KC_SPC)` - Space on tap, proxy layer on hold
+5. `encoder_update_user()` checks which encoder and whether its button is held
+6. Separate handler functions for each state:
+   - `handle_encoder_no_button()` - Normal rotation (layer-contextual)
+   - `handle_left_encoder_with_button()` - Left encoder with its button held (enhanced behavior)
+   - `handle_right_encoder_with_button()` - Right encoder with its button held (enhanced behavior)
+
+**Encoder Button Behaviors by Layer**:
+- **Base/Extra/Tap layers**: Left encoder button held = Alt+Tab window switching (Alt modifier held automatically)
+- **NUM layer**: Left encoder button held = Platform-specific window management with modifier hold:
+  - macOS: CMD+` (switches windows within the same app)
+  - Windows/Linux: Alt+Tab (switches between all windows)
+- **FUN layer**: Left encoder button held = RGB animation speed, Right encoder button held = RGB hue
+
+**Modifier Hold Pattern**: The implementation uses state tracking with separate boolean flags for each layer's modifier state:
+- `window_switching_active` - Alt held on Base layer
+- `num_window_switching_active` - CMD/Alt held on NUM layer
+- `app_switching_active` - Platform modifier held for app switching on NUM layer
+- `tab_switching_active` - CTRL held for tab switching on SYM layer
+
+**Automatic Modifier Release**: Modifiers are released in two scenarios:
+1. **Encoder button release**: Detected by monitoring transitions out of proxy layers (`U_ENC_LEFT`/`U_ENC_RIGHT`)
+2. **Layer change**: Detected when the underlying layer changes while the encoder button is held
+
+The implementation tracks `prev_highest` layer state to detect when exiting proxy layers, enabling proper cleanup when the encoder button is released.
 
 See `keyboards/crkbd/keymaps/manna-harbour_miryoku/keymap.c` for a complete implementation.
 
@@ -193,7 +214,9 @@ See `keyboards/crkbd/keymaps/manna-harbour_miryoku/keymap.c` for a complete impl
 ### CRKBD (Corne) rev4.1
 - Has 2 extra keys per half (uses `LAYOUT_split_3x6_3_ex2`)
 - Supports encoders with clickable buttons
-- Encoder buttons mapped as `LT(U_ENC_LEFT, KC_ENT)` and `LT(U_ENC_RIGHT, KC_SPC)`
+- Encoder buttons mapped as `LT(U_ENC_LEFT, KC_MUTE)` and `LT(U_ENC_RIGHT, KC_SPC)`
+- Left encoder button tap: Volume Mute
+- Right encoder button tap: Space
 - RGB matrix with 46 LEDs
 - Uses RP2040 microcontroller (ARM)
 

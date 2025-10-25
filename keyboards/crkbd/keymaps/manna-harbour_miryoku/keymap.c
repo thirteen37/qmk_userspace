@@ -25,6 +25,7 @@
   #define U_BCK LGUI(KC_LBRC) // Browser backward
   #define U_APP_MOD MOD_BIT(KC_LGUI) // App switch modifier (CMD)
   #define U_TAB_MOD MOD_BIT(KC_LCTL) // Tab switch modifier (CTRL)
+  #define U_WIN_MOD MOD_BIT(KC_LGUI) // Window management modifier (CMD)
   #define U_WIN_SWITCH_CW LGUI(KC_GRV) // Window switch clockwise (CMD+`)
   #define U_WIN_SWITCH_CCW LGUI(LSFT(KC_GRV)) // Window switch counter-clockwise (CMD+SHIFT+`)
   #define U_WORKSPACE_CW LCTL(KC_RGHT) // Workspace switch clockwise (CTRL+Right)
@@ -34,6 +35,7 @@
   #define U_BCK KC_WBAK // Browser backward (media key)
   #define U_APP_MOD MOD_BIT(KC_LALT) // App switch modifier (ALT)
   #define U_TAB_MOD MOD_BIT(KC_LCTL) // Tab switch modifier (CTRL)
+  #define U_WIN_MOD MOD_BIT(KC_LALT) // Window management modifier (ALT)
   #define U_WIN_SWITCH_CW LALT(KC_TAB) // Window switch clockwise (ALT+Tab)
   #define U_WIN_SWITCH_CCW LALT(LSFT(KC_TAB)) // Window switch counter-clockwise (ALT+SHIFT+Tab)
   #define U_WORKSPACE_CW LGUI(KC_RGHT) // Workspace switch clockwise (WIN+Right)
@@ -43,6 +45,7 @@
   #define U_BCK KC_WBAK // Browser backward (media key, default)
   #define U_APP_MOD MOD_BIT(KC_LALT) // App switch modifier (ALT, default)
   #define U_TAB_MOD MOD_BIT(KC_LCTL) // Tab switch modifier (CTRL, default)
+  #define U_WIN_MOD MOD_BIT(KC_LALT) // Window management modifier (ALT, default)
   #define U_WIN_SWITCH_CW LALT(KC_TAB) // Window switch clockwise (ALT+Tab, default)
   #define U_WIN_SWITCH_CCW LALT(LSFT(KC_TAB)) // Window switch counter-clockwise (ALT+SHIFT+Tab, default)
   #define U_WORKSPACE_CW LGUI(KC_RGHT) // Workspace switch clockwise (WIN+Right, default)
@@ -68,12 +71,14 @@
 
 // State tracking for app/tab switching with held modifiers
 typedef struct {
+    bool window_switching_active;    // Alt modifier held for window switching on Base layer
+    bool num_window_switching_active; // Platform modifier held for window switching on NUM layer
     bool app_switching_active;       // Platform modifier held for app switching on NUM layer
     bool tab_switching_active;       // CTRL held for tab switching on SYM layer
     uint8_t base_layer;              // The base layer when encoder proxy layer was activated
 } encoder_state_t;
 
-static encoder_state_t enc_state = {false, false, 0};
+static encoder_state_t enc_state = {false, false, false, false, 0};
 
 // Encoder proxy layers - activated automatically by QMK's LT functionality
 enum custom_encoder_layers {
@@ -83,14 +88,42 @@ enum custom_encoder_layers {
 
 layer_state_t layer_state_set_user(layer_state_t state) {
     uint8_t highest = get_highest_layer(state);
+    uint8_t prev_highest = get_highest_layer(layer_state);
 
     // Capture base layer when entering an encoder proxy layer
     if (highest == U_ENC_LEFT || highest == U_ENC_RIGHT) {
         // Only capture if we weren't already in a proxy layer
-        uint8_t prev_highest = get_highest_layer(layer_state);
         if (prev_highest != U_ENC_LEFT && prev_highest != U_ENC_RIGHT) {
             enc_state.base_layer = prev_highest;
         }
+    }
+
+    // Detect when we're exiting the left encoder proxy layer
+    if (prev_highest == U_ENC_LEFT && highest != U_ENC_LEFT) {
+        // Release window switch modifier if we were on Base/Extra/Tap when we entered
+        if ((enc_state.base_layer == U_BASE || enc_state.base_layer == U_EXTRA ||
+             enc_state.base_layer == U_TAP) && enc_state.window_switching_active) {
+            unregister_mods(MOD_BIT(KC_LALT));
+            enc_state.window_switching_active = false;
+        }
+        // Release NUM layer window switch modifier if we were on NUM when we entered
+        if (enc_state.base_layer == U_NUM && enc_state.num_window_switching_active) {
+            unregister_mods(U_WIN_MOD);
+            enc_state.num_window_switching_active = false;
+        }
+    }
+
+    // Also release window switch modifier if not in Base/Extra/Tap layers (layer change while holding)
+    if (!layer_state_cmp(state, U_BASE) && !layer_state_cmp(state, U_EXTRA) &&
+        !layer_state_cmp(state, U_TAP) && enc_state.window_switching_active) {
+        unregister_mods(MOD_BIT(KC_LALT));
+        enc_state.window_switching_active = false;
+    }
+
+    // Also release NUM layer window switch modifier if NUM layer is no longer active (layer change while holding)
+    if (!layer_state_cmp(state, U_NUM) && enc_state.num_window_switching_active) {
+        unregister_mods(U_WIN_MOD);
+        enc_state.num_window_switching_active = false;
     }
 
     // Release app switch modifier if NUM layer is no longer active
@@ -230,17 +263,27 @@ static void handle_left_encoder_with_button(bool clockwise, uint8_t context_laye
         case U_BASE:
         case U_EXTRA:
         case U_TAP:
-            // Window management
-            tap_code16(clockwise ? U_WIN_SWITCH_CW : U_WIN_SWITCH_CCW);
+            // Window switching with Alt modifier held (Option on Mac)
+            if (!enc_state.window_switching_active) {
+                register_mods(MOD_BIT(KC_LALT));
+                enc_state.window_switching_active = true;
+            }
+            tap_code16(clockwise ? KC_TAB : LSFT(KC_TAB));
             break;
 
         case U_NUM:
-            // App switching with platform modifier held
-            if (!enc_state.app_switching_active) {
-                register_mods(U_APP_MOD);
-                enc_state.app_switching_active = true;
+            // Window management with platform modifier held
+            if (!enc_state.num_window_switching_active) {
+                register_mods(U_WIN_MOD);
+                enc_state.num_window_switching_active = true;
             }
-            tap_code16(clockwise ? KC_TAB : LSFT(KC_TAB));
+            #if defined(MIRYOKU_CLIPBOARD_MAC)
+                // On Mac: CMD+` (grave accent) for window switching within the same app
+                tap_code16(clockwise ? KC_GRV : LSFT(KC_GRV));
+            #else
+                // On Windows/Linux: Alt+Tab for window switching
+                tap_code16(clockwise ? KC_TAB : LSFT(KC_TAB));
+            #endif
             break;
 
         case U_SYM:
@@ -251,6 +294,15 @@ static void handle_left_encoder_with_button(bool clockwise, uint8_t context_laye
         case U_NAV:
             // Word-wise navigation
             tap_code16(clockwise ? LCTL(KC_RGHT) : LCTL(KC_LEFT));
+            break;
+
+        case U_FUN:
+            // RGB animation speed
+            if (clockwise) {
+                rgb_matrix_increase_speed();
+            } else {
+                rgb_matrix_decrease_speed();
+            }
             break;
 
         default:
@@ -278,6 +330,15 @@ static void handle_right_encoder_with_button(bool clockwise, uint8_t context_lay
         case U_MEDIA:
             // Playlist navigation
             tap_code16(clockwise ? LCTL(KC_MNXT) : LCTL(KC_MPRV));
+            break;
+
+        case U_FUN:
+            // RGB hue
+            if (clockwise) {
+                rgb_matrix_increase_hue();
+            } else {
+                rgb_matrix_decrease_hue();
+            }
             break;
 
         default:
