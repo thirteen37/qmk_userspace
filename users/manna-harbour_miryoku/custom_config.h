@@ -16,6 +16,8 @@
 
 #define PERMISSIVE_HOLD
 
+#define CHORDAL_HOLD
+
 // Ergodox extended layout
 
 #ifdef KEYBOARD_kinesis
