@@ -69,16 +69,33 @@
 // - tap_code16(): Keycodes with modifiers (shortcuts, app switching)
 // - Direct RGB functions: Immediate visual feedback
 
+// App/window switching timeout (milliseconds)
+// How long to wait after the last encoder rotation before releasing modifier
+#define WINDOW_SWITCH_TIMEOUT_MS 500
+
 // State tracking for app/tab switching with held modifiers
 typedef struct {
-    bool window_switching_active;    // Alt modifier held for window switching on Base layer
-    bool num_window_switching_active; // Platform modifier held for window switching on NUM layer
-    bool app_switching_active;       // Platform modifier held for app switching on NUM layer
+    bool window_switching_active;    // Alt modifier held for window switching on NUM layer (no timeout)
+    bool num_window_switching_active; // Platform modifier held for window management on NUM layer (button held)
+    bool app_switching_active;       // Platform modifier held for app switching on Base layer (with timeout)
     bool tab_switching_active;       // CTRL held for tab switching on SYM layer
     uint8_t base_layer;              // The base layer when encoder proxy layer was activated
 } encoder_state_t;
 
 static encoder_state_t enc_state = {false, false, false, false, 0};
+
+// Deferred execution token for window switching timeout
+static deferred_token window_switch_timeout_token = INVALID_DEFERRED_TOKEN;
+
+// Timeout callback to release app switching modifier (Base layer)
+static uint32_t window_switch_timeout_callback(uint32_t trigger_time, void *cb_arg) {
+    if (enc_state.app_switching_active) {
+        unregister_mods(U_APP_MOD);
+        enc_state.app_switching_active = false;
+    }
+    window_switch_timeout_token = INVALID_DEFERRED_TOKEN;
+    return 0; // Don't repeat
+}
 
 // Encoder proxy layers - activated automatically by QMK's LT functionality
 enum custom_encoder_layers {
@@ -98,6 +115,15 @@ layer_state_t layer_state_set_user(layer_state_t state) {
         }
     }
 
+    // Detect when we're entering the left encoder proxy layer (button pressed)
+    // Cancel the window switch timeout since we're now doing volume control
+    if (highest == U_ENC_LEFT && prev_highest != U_ENC_LEFT) {
+        if (window_switch_timeout_token != INVALID_DEFERRED_TOKEN) {
+            cancel_deferred_exec(window_switch_timeout_token);
+            window_switch_timeout_token = INVALID_DEFERRED_TOKEN;
+        }
+    }
+
     // Detect when we're exiting the left encoder proxy layer
     if (prev_highest == U_ENC_LEFT && highest != U_ENC_LEFT) {
         // Release window switch modifier if we were on Base/Extra/Tap when we entered
@@ -113,23 +139,28 @@ layer_state_t layer_state_set_user(layer_state_t state) {
         }
     }
 
-    // Also release window switch modifier if not in Base/Extra/Tap layers (layer change while holding)
+    // Release app switch modifier if not in Base/Extra/Tap layers
     if (!layer_state_cmp(state, U_BASE) && !layer_state_cmp(state, U_EXTRA) &&
-        !layer_state_cmp(state, U_TAP) && enc_state.window_switching_active) {
+        !layer_state_cmp(state, U_TAP) && enc_state.app_switching_active) {
+        unregister_mods(U_APP_MOD);
+        enc_state.app_switching_active = false;
+        // Cancel timeout when manually releasing via layer change
+        if (window_switch_timeout_token != INVALID_DEFERRED_TOKEN) {
+            cancel_deferred_exec(window_switch_timeout_token);
+            window_switch_timeout_token = INVALID_DEFERRED_TOKEN;
+        }
+    }
+
+    // Release window switch modifier if NUM layer is no longer active
+    if (!layer_state_cmp(state, U_NUM) && enc_state.window_switching_active) {
         unregister_mods(MOD_BIT(KC_LALT));
         enc_state.window_switching_active = false;
     }
 
-    // Also release NUM layer window switch modifier if NUM layer is no longer active (layer change while holding)
+    // Release NUM layer window management modifier if NUM layer is no longer active
     if (!layer_state_cmp(state, U_NUM) && enc_state.num_window_switching_active) {
         unregister_mods(U_WIN_MOD);
         enc_state.num_window_switching_active = false;
-    }
-
-    // Release app switch modifier if NUM layer is no longer active
-    if (!layer_state_cmp(state, U_NUM) && enc_state.app_switching_active) {
-        unregister_mods(U_APP_MOD);
-        enc_state.app_switching_active = false;
     }
 
     // Release tab switch modifier if SYM layer is no longer active
@@ -166,8 +197,22 @@ static void handle_encoder_no_button(uint8_t index, bool clockwise, uint8_t curr
         case U_BASE:
         case U_EXTRA:
         case U_TAP:
-            if (index == 0) { // Left encoder: Volume
-                tap_code(clockwise ? KC_VOLU : KC_VOLD);
+            if (index == 0) { // Left encoder: App switching with platform modifier held
+                if (!enc_state.app_switching_active) {
+                    register_mods(U_APP_MOD);
+                    enc_state.app_switching_active = true;
+                }
+                if (clockwise) {
+                    tap_code(KC_TAB);
+                } else {
+                    tap_code16(LSFT(KC_TAB));
+                }
+
+                // Cancel any existing timeout and schedule a new one
+                if (window_switch_timeout_token != INVALID_DEFERRED_TOKEN) {
+                    cancel_deferred_exec(window_switch_timeout_token);
+                }
+                window_switch_timeout_token = defer_exec(WINDOW_SWITCH_TIMEOUT_MS, window_switch_timeout_callback, NULL);
             } else if (index == 2) { // Right encoder: Vertical scroll
                 tap_code(clockwise ? MS_WHLU : MS_WHLD);
             }
@@ -200,22 +245,18 @@ static void handle_encoder_no_button(uint8_t index, bool clockwise, uint8_t curr
         case U_MEDIA:
             if (index == 0) { // Left encoder: Volume
                 tap_code(clockwise ? KC_VOLU : KC_VOLD);
-            } else if (index == 2) { // Right encoder: Track prev/next
-                tap_code(clockwise ? KC_MNXT : KC_MPRV);
+            } else if (index == 2) { // Right encoder: Volume control
+                tap_code(clockwise ? KC_VOLU : KC_VOLD);
             }
             break;
 
         case U_NUM:
-            if (index == 0) { // Left encoder: App switching with platform modifier held
-                if (!enc_state.app_switching_active) {
-                    register_mods(U_APP_MOD);
-                    enc_state.app_switching_active = true;
+            if (index == 0) { // Left encoder: Window switching with Alt modifier held
+                if (!enc_state.window_switching_active) {
+                    register_mods(MOD_BIT(KC_LALT));
+                    enc_state.window_switching_active = true;
                 }
-                if (clockwise) {
-                    tap_code(KC_TAB);
-                } else {
-                    tap_code16(LSFT(KC_TAB)); // Use tap_code16 for modifier combinations
-                }
+                tap_code16(clockwise ? KC_TAB : LSFT(KC_TAB));
             } else if (index == 2) { // Right encoder: Vertical scroll
                 tap_code(clockwise ? MS_WHLU : MS_WHLD);
             }
@@ -263,12 +304,8 @@ static void handle_left_encoder_with_button(bool clockwise, uint8_t context_laye
         case U_BASE:
         case U_EXTRA:
         case U_TAP:
-            // Window switching with Alt modifier held (Option on Mac)
-            if (!enc_state.window_switching_active) {
-                register_mods(MOD_BIT(KC_LALT));
-                enc_state.window_switching_active = true;
-            }
-            tap_code16(clockwise ? KC_TAB : LSFT(KC_TAB));
+            // Volume control
+            tap_code(clockwise ? KC_VOLU : KC_VOLD);
             break;
 
         case U_NUM:
@@ -328,8 +365,8 @@ static void handle_right_encoder_with_button(bool clockwise, uint8_t context_lay
             break;
 
         case U_MEDIA:
-            // Playlist navigation
-            tap_code16(clockwise ? LCTL(KC_MNXT) : LCTL(KC_MPRV));
+            // Track prev/next
+            tap_code(clockwise ? KC_MNXT : KC_MPRV);
             break;
 
         case U_FUN:

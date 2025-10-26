@@ -66,12 +66,12 @@ All encoder behavior is handled through a single `encoder_update_user()` callbac
 
 | Layer | Left Encoder (Normal) | Left Encoder (Button Held) | Right Encoder (Normal) | Right Encoder (Button Held) |
 |-------|---------------------|---------------------------|----------------------|----------------------------|
-| **Base/Extra/Tap** | Volume Control | Window Switching (Alt+Tab / Option+Tab) | Vertical Scroll | Page Navigation (PgUp/PgDn) |
-| **Button** | Browser Forward/Back | Window Switching (Alt+Tab) | Undo/Redo | Page Navigation |
+| **Base/Extra/Tap** | App Switching (Platform Modifier) | Volume Control | Vertical Scroll | Page Navigation (PgUp/PgDn) |
+| **Button** | Browser Forward/Back | App Switching | Undo/Redo | Page Navigation |
 | **Nav** | Left/Right Cursor | Word Navigation (Ctrl+Arrow) | Undo/Redo | Page Navigation |
 | **Mouse** | Horizontal Scroll | Volume Control | Vertical Scroll | Horizontal Scroll |
-| **Media** | Volume Control | Volume Control | Track Prev/Next | Playlist Navigation (Ctrl+Next/Prev) |
-| **Num** | App Switching (Enhanced) | Window Management (CMD+` / ALT+Tab) | Vertical Scroll | Vertical Scroll |
+| **Media** | Volume Control | Volume Control | Volume Control | Track Prev/Next |
+| **Num** | Window Switching (Alt+Tab / Option+Tab) | Window Management (CMD+` / ALT+Tab) | Vertical Scroll | Vertical Scroll |
 | **Sym** | Tab Switching (Enhanced) | Recent Tabs (Ctrl+Tab) | Vertical Scroll | Vertical Scroll |
 | **Fun** | RGB Animation (Direct) | RGB Animation Speed | RGB Brightness (Direct) | RGB Hue |
 
@@ -160,21 +160,44 @@ Contains comprehensive contextual encoder implementation:
 
 ## Usage Examples
 
-### Window Switching (Base Layer + Left Encoder Button)
-1. Hold left encoder button (activates `U_ENC_LEFT` proxy layer)
-2. Rotate left encoder: Switch windows with Alt+Tab (Option+Tab on Mac)
-3. Alt modifier is automatically held while rotating
-4. **Release encoder button**: Alt modifier automatically released, selected window is activated
+### App Switching (Base Layer + Left Encoder)
+1. Rotate left encoder: Switch between applications
+2. Platform modifier is automatically held (CMD on Mac, Alt on Windows/Linux)
+3. Continue rotating to cycle through applications
+4. **Stop rotating**: Modifier automatically released after 500ms, selected app is activated
 
-This provides smooth window switching - the Alt modifier is held only while the encoder button is pressed, allowing you to quickly cycle through windows and release to select.
+**macOS**: CMD+Tab / CMD+Shift+Tab
+**Windows/Linux**: Alt+Tab / Alt+Shift+Tab
 
-### Enhanced App Switching (NUM Layer)
+**Multiple Release Methods**:
+- **Automatic timeout**: Stop rotating for 500ms → Modifier releases automatically
+- **Layer change**: Leave Base layer → Modifier releases immediately
+
+Each rotation resets the timeout timer, allowing smooth continuous app cycling.
+
+**Customization**: The timeout duration can be adjusted by changing `WINDOW_SWITCH_TIMEOUT_MS` in `keymap.c` (default: 500ms).
+
+### Volume Control (Base Layer + Left Encoder Button Held)
+1. Hold left encoder button
+2. Rotate left encoder: Adjust volume up/down
+3. Release encoder button: Return to normal app switching behavior
+
+### Window Switching (NUM Layer + Left Encoder)
 1. Hold NUM layer key
-2. Rotate left encoder: Next/previous app with modifier auto-held
-3. Hold left encoder button + rotate: Window management with platform modifier held
+2. Rotate left encoder: Switch windows with Alt+Tab (Option+Tab on Mac)
+3. Alt modifier is automatically registered on first rotation
+4. Continue rotating to cycle through windows
+5. **Release NUM layer**: Alt modifier automatically released, selected window is activated
+
+**Release Method**:
+- **Layer change**: Release NUM layer → Alt releases immediately (no timeout on NUM layer)
+
+### Window Management (NUM Layer + Left Encoder Button Held)
+1. Hold NUM layer key + left encoder button
+2. Rotate left encoder: Platform-specific window management
    - **macOS**: CMD+` / CMD+Shift+` (switch windows within the same app)
    - **Windows/Linux**: Alt+Tab / Alt+Shift+Tab (switch between all windows)
-4. Release layer: All modifiers automatically cleaned up
+3. Release: All modifiers automatically cleaned up
 
 ### Contextual Navigation Examples
 

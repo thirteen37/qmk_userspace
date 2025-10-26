@@ -188,24 +188,41 @@ For keyboards with rotary encoders (like CRKBD rev4.1), this codebase uses a sop
    - `handle_left_encoder_with_button()` - Left encoder with its button held (enhanced behavior)
    - `handle_right_encoder_with_button()` - Right encoder with its button held (enhanced behavior)
 
-**Encoder Button Behaviors by Layer**:
-- **Base/Extra/Tap layers**: Left encoder button held = Alt+Tab window switching (Alt modifier held automatically)
-- **NUM layer**: Left encoder button held = Platform-specific window management with modifier hold:
+**Encoder Behaviors by Layer** (Base/Extra/Tap):
+- **Left encoder normal rotation**: App switching with platform modifier (CMD on Mac, Alt on Windows/Linux)
+- **Left encoder button held + rotation**: Volume control
+- **Right encoder normal rotation**: Vertical scroll
+- **Right encoder button held + rotation**: Page navigation
+
+**NUM Layer**:
+- **Left encoder normal rotation**: Alt+Tab window switching (Alt modifier held with 500ms timeout)
+- **Left encoder button held**: Platform-specific window management with modifier hold:
   - macOS: CMD+` (switches windows within the same app)
   - Windows/Linux: Alt+Tab (switches between all windows)
-- **FUN layer**: Left encoder button held = RGB animation speed, Right encoder button held = RGB hue
+
+**FUN Layer**:
+- **Left encoder button held**: RGB animation speed
+- **Right encoder button held**: RGB hue
 
 **Modifier Hold Pattern**: The implementation uses state tracking with separate boolean flags for each layer's modifier state:
-- `window_switching_active` - Alt held on Base layer
-- `num_window_switching_active` - CMD/Alt held on NUM layer
-- `app_switching_active` - Platform modifier held for app switching on NUM layer
+- `window_switching_active` - Alt held on NUM layer (no timeout - releases on layer change)
+- `num_window_switching_active` - CMD/Alt held on NUM layer for window management (button held)
+- `app_switching_active` - Platform modifier held for app switching on Base layer (with timeout)
 - `tab_switching_active` - CTRL held for tab switching on SYM layer
 
-**Automatic Modifier Release**: Modifiers are released in two scenarios:
-1. **Encoder button release**: Detected by monitoring transitions out of proxy layers (`U_ENC_LEFT`/`U_ENC_RIGHT`)
-2. **Layer change**: Detected when the underlying layer changes while the encoder button is held
+**Automatic Modifier Release**: Modifiers are released in multiple scenarios:
+1. **Timeout (Base layer app switching)**: 500ms after last encoder rotation using QMK's deferred execution
+2. **Encoder button press**: When entering encoder proxy layers (switches to volume control)
+3. **Encoder button release**: When exiting encoder proxy layers
+4. **Layer change**: When the underlying layer changes
 
-The implementation tracks `prev_highest` layer state to detect when exiting proxy layers, enabling proper cleanup when the encoder button is released.
+**Timeout Implementation**: Uses QMK's `defer_exec()` and `cancel_deferred_exec()`:
+- Each encoder rotation on Base layer schedules/reschedules a timeout (default: 500ms)
+- The timeout callback releases the platform modifier automatically
+- Timeout is canceled when pressing encoder button or changing layers
+- Timeout duration configurable via `WINDOW_SWITCH_TIMEOUT_MS` define in `keymap.c`
+- Requires `DEFERRED_EXEC_ENABLE = yes` in `rules.mk`
+- **Note**: NUM layer window switching does NOT use timeout - modifier releases when layer changes
 
 See `keyboards/crkbd/keymaps/manna-harbour_miryoku/keymap.c` for a complete implementation.
 
