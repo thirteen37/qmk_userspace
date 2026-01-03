@@ -7,16 +7,16 @@
 
 #define EE_HANDS
 
+// https://www.reddit.com/r/ErgoMechKeyboards/comments/1q1jo3c/urobs_zmk_timeless_home_row_mods_ported_to_native/
 #undef TAPPING_TERM
-#define TAPPING_TERM 200
+#define TAPPING_TERM 250
 #undef QUICK_TAP_TERM
 #define QUICK_TAP_TERM 120
-
 #define TAPPING_TERM_PER_KEY
-
 #define PERMISSIVE_HOLD
-
 #define CHORDAL_HOLD
+#define FLOW_TAP_TERM 150
+#define SPECULATIVE_HOLD
 
 // Ergodox extended layout
 
