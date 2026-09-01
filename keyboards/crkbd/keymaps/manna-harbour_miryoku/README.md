@@ -10,6 +10,33 @@ This keymap adds comprehensive contextual encoder support to the Miryoku layout 
   - Left encoder: matrix position [0,0] (first encoder)
   - Right encoder: matrix position [2,0] (third encoder)
 
+## Apple Globe (fn) Key
+
+The second inner-column key on each half — matrix `[1,6]`, previously `KC_CAPS`
+on both halves — is mapped to `AP_GLOB`, an Apple Globe key. It sends
+Consumer Usage `0x029D` (`AC_NEXT_KEYBOARD_LAYOUT_SELECT`) via `host_consumer_send()`,
+which macOS treats as a real fn modifier — including remapping in
+System Settings → Keyboard → Modifier Keys. `KEYBOARD_SHARED_EP = yes` in `rules.mk`
+puts the consumer report on the keyboard endpoint, which macOS requires for this.
+
+`AP_GLOB` is `#define`d in `config.h` rather than as an enum in `keymap.c`, because
+the `LAYOUT_miryoku` macro is expanded in `users/manna-harbour_miryoku.c`, which
+cannot see `keymap.c`'s enums.
+
+The right-hand key is `AP_GLCW` instead: **tap for Caps Word, hold for Globe**.
+`MT()`/`LT()` cannot put a custom keycode in the hold position, so the tap-hold
+is resolved manually in `process_record_user()` — Globe is sent only once the
+hold is confirmed, either by outlasting `TAPPING_TERM` or by any other key being
+pressed first. Sending it eagerly on press would fire macOS's Globe action on
+every tap.
+
+The encoder push buttons are untouched — they remain `LT()` keys, so every
+contextual encoder behavior documented below still works.
+
+Paired with [hyper](https://github.com/thirteen37/hyper), which can take
+`key: "globe"` as its leader: hold Globe for the leader modal, tap it for the
+native macOS Globe action.
+
 ## Contextual Encoder System Overview
 
 The contextual encoder system provides two distinct behaviors per encoder per layer:

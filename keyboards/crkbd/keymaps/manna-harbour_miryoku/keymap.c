@@ -103,6 +103,69 @@ enum custom_encoder_layers {
     U_ENC_RIGHT,                // Proxy layer activated by LT(U_ENC_RIGHT, KC_SPC) - right encoder button
 };
 
+// Apple Globe (fn) key: Consumer Usage 0x029D. macOS treats this as a real
+// modifier, remappable in System Settings > Keyboard > Modifier Keys.
+// Requires KEYBOARD_SHARED_EP = yes so the consumer report shares the keyboard
+// endpoint (macOS only honours fn from the keyboard interface).
+//
+// AP_GLCW (right half) is a tap-hold: tap = Caps Word, hold = Globe. QMK's
+// MT()/LT() cannot put a custom keycode in the hold position, so it is resolved
+// here with the same deferred-exec machinery the encoders use. Globe is only
+// sent once the hold is confirmed — sending it eagerly on press would fire
+// macOS's Globe action on every tap.
+static deferred_token glob_hold_token = INVALID_DEFERRED_TOKEN;
+static bool glob_hold_sent = false;
+
+// Confirm the hold: send Globe and stop waiting on the tapping term.
+static void glob_resolve_hold(void) {
+    if (glob_hold_token != INVALID_DEFERRED_TOKEN) {
+        cancel_deferred_exec(glob_hold_token);
+        glob_hold_token = INVALID_DEFERRED_TOKEN;
+    }
+    if (!glob_hold_sent) {
+        glob_hold_sent = true;
+        host_consumer_send(AC_NEXT_KEYBOARD_LAYOUT_SELECT);
+    }
+}
+
+static uint32_t glob_hold_callback(uint32_t trigger_time, void *cb_arg) {
+    glob_hold_token = INVALID_DEFERRED_TOKEN;
+    glob_resolve_hold();
+    return 0; // Don't repeat
+}
+
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // Any other key pressed while AP_GLCW is still undecided resolves it as a
+    // hold, so Globe chords work without waiting out the tapping term. This is
+    // the same intent as HOLD_ON_OTHER_KEY_PRESS.
+    if (record->event.pressed && keycode != AP_GLCW && glob_hold_token != INVALID_DEFERRED_TOKEN) {
+        glob_resolve_hold();
+    }
+
+    switch (keycode) {
+        case AP_GLOB:
+            host_consumer_send(record->event.pressed ? AC_NEXT_KEYBOARD_LAYOUT_SELECT : 0);
+            return false;
+
+        case AP_GLCW:
+            if (record->event.pressed) {
+                glob_hold_sent = false;
+                glob_hold_token = defer_exec(TAPPING_TERM, glob_hold_callback, NULL);
+            } else if (glob_hold_sent) {
+                host_consumer_send(0); // Release Globe
+                glob_hold_sent = false;
+            } else {
+                // Released before the tapping term and before any other key
+                cancel_deferred_exec(glob_hold_token);
+                glob_hold_token = INVALID_DEFERRED_TOKEN;
+                caps_word_toggle();
+            }
+            return false;
+    }
+
+    return true;
+}
+
 layer_state_t layer_state_set_user(layer_state_t state) {
     uint8_t highest = get_highest_layer(state);
     uint8_t prev_highest = get_highest_layer(layer_state);

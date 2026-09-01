@@ -1,5 +1,11 @@
 #pragma once
 
+// Apple Globe (fn) keys. Defined here rather than as an enum in keymap.c
+// because the layout macro below is expanded in users/manna-harbour_miryoku.c,
+// which cannot see keymap.c's enums. Both are handled in process_record_user().
+#define AP_GLOB SAFE_RANGE          // plain Globe
+#define AP_GLCW (SAFE_RANGE + 1)    // tap: Caps Word, hold: Globe
+
 // Define LAYOUT_miryoku mapping for CRKBD v4.1 using extra keys
 // Uses LAYOUT_split_3x6_3_ex2 to utilize the additional keys in v4.1
 //
@@ -29,7 +35,7 @@
 ) \
 LAYOUT_split_3x6_3_ex2( \
      U_NU, K00, K01, K02, K03, K04, LT(U_ENC_LEFT, KC_MUTE),     LT(U_ENC_RIGHT, KC_SPC), K05, K06, K07, K08, K09, U_NU, \
-     U_NU, K10, K11, K12, K13, K14, KC_CAPS,                                     KC_CAPS, K15, K16, K17, K18, K19, U_NU, \
+     U_NU, K10, K11, K12, K13, K14, AP_GLOB,                                     AP_GLCW, K15, K16, K17, K18, K19, U_NU, \
      U_NU, K20, K21, K22, K23, K24,                                                       K25, K26, K27, K28, K29, U_NU, \
                          K32, K33, K34,                                                K35, K36, K37 \
 )
